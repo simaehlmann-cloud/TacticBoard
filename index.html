@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!-- Verknüpfung zum Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- Apple iOS Feineinstellungen für echtes App-Feeling -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MeineApp">
+
+<!-- Das App-Icon für das iPhone Home-Bildschirm (Beispielgröße: 180x180 px) -->
+<link rel="apple-touch-icon" href="apple-icon.png">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kinderfußball Taktiktafel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #222;
+            color: #fff;
+            margin: 0;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        h1 { font-size: 18px; margin: 2px 0 6px 0; text-align: center; }
+
+        #zoom-wrapper {
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 3 / 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s ease;
+            transform-origin: top center;
+        }
+
+        #football-field {
+            width: 100%;
+            height: 100%;
+            background-color: #4caf50;
+            border: 3px solid #fff;
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            touch-action: none;
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) {
+            h1 { display: none; }
+            #zoom-wrapper {
+                max-width: none;
+                height: 55vh; 
+                width: auto;
+            }
+        }
+
+        #football-field::before {
+            content: ''; position: absolute; top: 0; bottom: 0; left: 50%;
+            width: 3px; background-color: #fff; transform: translateX(-50%);
+        }
+
+        #center-circle {
+            position: absolute; top: 50%; left: 50%; width: 25%; aspect-ratio: 1/1;
+            border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
+        }
+
+        #penalty-left {
+            position: absolute; top: 50%; left: 0; width: 15%; height: 50%;
+            border: 3px solid #fff; border-left: none; transform: translateY(-50%); box-sizing: border-box;
+        }
+
+        #penalty-right {
+            position: absolute; top: 50%; right: 0; width: 15%; height: 50%;
+            border: 3px solid #fff; border-right: none; transform: translateY(-50%); box-sizing: border-box;
+        }
+
+        .player {
+            position: absolute; width: 9%; aspect-ratio: 1 / 1;
+            background-color: #e63946; color: white;
+            border: 2px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-size: 10px; font-weight: bold; text-align: center; padding: 2px; box-sizing: border-box;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.4); z-index: 10;
+            touch-action: none;
+        }
+
+        .player.enemy { background-color: #1d3557; color: white; }
+
+        .player.ball {
+            width: 7%; background-color: #fff; color: #000; border: 1px solid #000; font-size: 11px; z-index: 11;
+        }
+
+        .player.cone {
+            width: 8%; background-color: #ff9f1c; color: white; border: 2px solid #fff; font-size: 11px; z-index: 9;
+        }
+
+        .player.active { border-color: #ffeb3b; box-shadow: 0 0 12px #ffeb3b; }
+
+        .arrow-line {
+            position: absolute; height: 4px; background-color: #ffeb3b; transform-origin: left center;
+            left: 50%; top: 45%; z-index: 5; display: block; pointer-events: none;
+        }
+
+        .arrow-line::after {
+            content: ''; position: absolute; right: -6px; top: -5px; width: 0; height: 0;
+            border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 10px solid #ffeb3b;
+        }
+        .arrow-line.active { background-color: #00f0ff; }
+        .arrow-line.active::after { border-left-color: #00f0ff; }
+
+        #controls {
+            margin-top: 10px; background-color: #333; padding: 10px; border-radius: 8px;
+            display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 450px; box-sizing: border-box;
+        }
+
+        .input-row { display: flex; gap: 6px; width: 100%; align-items: center; justify-content: space-between; }
+        .button-row { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; margin-top: 4px; }
+
+        input[type="text"] { width: 30%; max-width: 120px; padding: 10px; border: none; border-radius: 4px; font-size: 14px; color: #000; box-sizing: border-box; }
+
+        button { 
+            padding: 10px 12px; background-color: #1d3557; color: white; border: none; 
+            border-radius: 4px; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        
+        #action-btn { background-color: #e63946; }
+        #enemy-btn { background-color: #1d3557; }
+        #ball-btn { background-color: #f1faee; color: #000; font-size: 14px; border: 1px solid #000; }
+        #cone-btn { background-color: #ff9f1c; font-size: 14px; }
+        #clear-all-btn { background-color: #555; }
+
+        #add-arrow-btn { background-color: #f4a261; display: none; }
+        #next-arrow-btn { background-color: #778da9; display: none; }
+        #rotate-arrow-btn { background-color: #2a9d8f; display: none; }
+        #length-plus-btn { background-color: #e76f51; display: none; }
+        #length-minus-btn { background-color: #e76f51; display: none; }
+        #delete-btn { background-color: #b70909; display: none; }
+
+        .zoom-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #444; padding: 6px 10px; border-radius: 4px; font-size: 13px; margin-top: 2px;
+        }
+        .zoom-row input { flex-grow: 1; margin-left: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>Fußball Taktiktafel</h1>
+
+    <div id="zoom-wrapper">
+        <div id="football-field">
+            <div id="center-circle"></div>
+            <div id="penalty-left"></div>
+            <div id="penalty-right"></div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div class="input-row">
+            <input type="text" id="player-name" placeholder="Name...">
+            <button id="action-btn">＋</button>
+            <button id="enemy-btn">＋</button>
+            <button id="ball-btn">⚽</button>
+            <button id="cone-btn">▲</button>
+            <button id="clear-all-btn">🔄</button>
+        </div>
+        <div class="button-row">
+            <button id="add-arrow-btn">➦ Pfeil</button>
+            <button id="next-arrow-btn">➔ Nächster</button>
+            <button id="rotate-arrow-btn">↻ Drehen</button>
+            <button id="length-plus-btn">➕ Länge</button>
+            <button id="length-minus-btn">➖ Länge</button>
+            <button id="delete-btn">🗑️</button>
+        </div>
+        <div class="zoom-row">
+            <span>Display-Größe:</span>
+            <input type="range" id="size-slider" min="60" max="180" value="100">
+        </div>
+    </div>
+<script>
+    var field = document.getElementById('football-field');
+    var zoomWrapper = document.getElementById('zoom-wrapper');
+    var nameInput = document.getElementById('player-name');
+    var actionBtn = document.getElementById('action-btn');
+    var enemyBtn = document.getElementById('enemy-btn');
+    var ballBtn = document.getElementById('ball-btn');
+    var coneBtn = document.getElementById('cone-btn');
+    var clearAllBtn = document.getElementById('clear-all-btn');
+    var sizeSlider = document.getElementById('size-slider');
+    
+    var addArrowBtn = document.getElementById('add-arrow-btn');
+    var nextArrowBtn = document.getElementById('next-arrow-btn');
+    var rotateArrowBtn = document.getElementById('rotate-arrow-btn');
+    var lengthPlusBtn = document.getElementById('length-plus-btn');
+    var lengthMinusBtn = document.getElementById('length-minus-btn');
+    var deleteBtn = document.getElementById('delete-btn');
+
+    var activePlayer = null;
+    var activeArrow = null;
+    var enemyCounter = 0;
+
+    sizeSlider.oninput = function() {
+        zoomWrapper.style.transform = 'scale(' + (this.value / 100) + ')';
+        zoomWrapper.style.marginBottom = ((this.value - 100) * 2) + 'px';
+    };
+
+    clearAllBtn.onclick = function() {
+        if (confirm("Spielfeld komplett aufräumen?")) {
+            var p = field.getElementsByClassName('player');
+            while (p.length > 0) p[0].parentNode.removeChild(p[0]);
+            enemyCounter = 0; selectPlayer(null);
+        }
+    };
+
+    actionBtn.onclick = function() {
+        var name = nameInput.value.trim(); if (name === '') return;
+        var player = document.createElement('div');
+        player.className = 'player'; player.innerText = name;
+        player.style.left = '45%'; player.style.top = '45%';
+        player.myArrows = []; player.isSelectable = true;
+        setupPercentTouchDrag(player, 9); field.appendChild(player);
+        nameInput.value = ''; selectPlayer(player);
+    };
+
+    enemyBtn.onclick = function() {
+        enemyCounter++; var enemy = document.createElement('div');
+        enemy.className = 'player enemy'; enemy.innerText = enemyCounter;
+        enemy.style.left = '50%'; enemy.style.top = '45%';
+        enemy.myArrows = []; enemy.isSelectable = true;
+        setupPercentTouchDrag(enemy, 9); field.appendChild(enemy);
+        selectPlayer(enemy);
+    };
+
+    ballBtn.onclick = function() {
+        var ball = document.createElement('div');
+        ball.className = 'player ball'; ball.innerText = '⚽';
+        ball.style.left = '48%'; ball.style.top = '55%';
+        ball.isSelectable = false; setupPercentTouchDrag(ball, 7);
+        field.appendChild(ball); selectPlayer(ball);
+    };
+
+    coneBtn.onclick = function() {
+        var cone = document.createElement('div');
+        cone.className = 'player cone'; cone.innerText = '▲';
+        cone.style.left = '40%'; cone.style.top = '55%';
+        cone.isSelectable = false; setupPercentTouchDrag(cone, 8);
+        field.appendChild(cone); selectPlayer(cone);
+    };
+
+    addArrowBtn.onclick = function() {
+        if (!activePlayer || !activePlayer.isSelectable) return;
+        if (activePlayer.myArrows.length >= 5) return;
+        var arrow = document.createElement('div');
+        arrow.className = 'arrow-line'; arrow.style.width = '50px';
+        arrow.setAttribute('data-angle', '0'); arrow.setAttribute('data-width', '50');
+        activePlayer.appendChild(arrow); activePlayer.myArrows.push(arrow);
+        selectArrow(arrow);
+    };
+
+    nextArrowBtn.onclick = function() {
+        if (!activePlayer || !activePlayer.myArrows || activePlayer.myArrows.length === 0) return;
+        var idx = activePlayer.myArrows.indexOf(activeArrow);
+        var next = idx + 1;
+        if (next >= activePlayer.myArrows.length || idx === -1) next = 0;
+        selectArrow(activePlayer.myArrows[next]);
+    };
+
+    rotateArrowBtn.onclick = function() {
+        if (!activeArrow) return;
+        var ang = parseInt(activeArrow.getAttribute('data-angle') || '0') + 45;
+        if (ang >= 360) ang = 0;
+        activeArrow.setAttribute('data-angle', ang);
+        activeArrow.style.transform = 'rotate(' + ang + 'deg)';
+    };
+
+    lengthPlusBtn.onclick = function() {
+        if (!activeArrow) return;
+        var w = parseInt(activeArrow.getAttribute('data-width') || '50') + 15;
+        if (w > 150) w = 150;
+        activeArrow.setAttribute('data-width', w); activeArrow.style.width = w + 'px';
+    };
+
+    lengthMinusBtn.onclick = function() {
+        if (!activeArrow) return;
+        var w = parseInt(activeArrow.getAttribute('data-width') || '50') - 15;
+        if (w < 20) { removeCurrentArrow(); } 
+        else { activeArrow.setAttribute('data-width', w); activeArrow.style.width = w + 'px'; }
+    };
+
+    deleteBtn.onclick = function() {
+        if (activeArrow) { removeCurrentArrow(); } 
+        else if (activePlayer) { activePlayer.parentNode.removeChild(activePlayer); activePlayer = null; updateButtonVisibility(); }
+    };
+
+    function removeCurrentArrow() {
+        if (!activeArrow || !activePlayer || !activePlayer.myArrows) return;
+        var idx = activePlayer.myArrows.indexOf(activeArrow);
+        if (idx > -1) activePlayer.myArrows.splice(idx, 1);
+        activeArrow.parentNode.removeChild(activeArrow); activeArrow = null;
+        updateButtonVisibility();
+    }
+
+    function selectPlayer(p) {
+        if (activePlayer) activePlayer.classList.remove('active');
+        if (activeArrow) activeArrow.classList.remove('active');
+        activeArrow = null; activePlayer = p; if (p) p.classList.add('active');
+        updateButtonVisibility();
+    }
+
+    function selectArrow(a) {
+        if (activeArrow) activeArrow.classList.remove('active');
+        activeArrow = a; a.classList.add('active'); updateButtonVisibility();
+    }
+
+    function updateButtonVisibility() {
+        var realP = activePlayer && activePlayer.isSelectable;
+        addArrowBtn.style.display = realP ? 'block' : 'none';
+        nextArrowBtn.style.display = (realP && activePlayer.myArrows.length > 0) ? 'block' : 'none';
+        deleteBtn.style.display = (activePlayer || activeArrow) ? 'block' : 'none';
+        rotateArrowBtn.style.display = activeArrow ? 'block' : 'none';
+        lengthPlusBtn.style.display = activeArrow ? 'block' : 'none';
+        lengthMinusBtn.style.display = activeArrow ? 'block' : 'none';
+    }
+
+    // Korrigierte Touch-Logik mit exaktem Finger-Index [0]
+    function setupPercentTouchDrag(el, size) {
+        var sX = 0, sY = 0, sL = 0, sT = 0;
+        el.ontouchstart = function(e) {
+            var node = e.target.nodeName.toLowerCase();
+            if (node !== 'button' && node !== 'input' && e.cancelable) e.preventDefault();
+            selectPlayer(el); 
+            
+            var touch = e.touches[0]; // Korrektur: Greift exakt auf den ersten Finger zu
+            sX = touch.clientX; sY = touch.clientY;
+            sL = parseFloat(el.style.left) || 0; sT = parseFloat(el.style.top) || 0;
+            
+            el.ontouchmove = function(ev) {
+                var t = ev.touches[0]; // Korrektur: Folgt exakt dem ersten Finger
+                var scale = sizeSlider.value / 100;
+                var dX = (t.clientX - sX) / scale; var dY = (t.clientY - sY) / scale;
+                var fL = sL + ((dX / field.clientWidth) * 100);
+                var fT = sT + ((dY / field.clientHeight) * 100);
+                var max = 100 - size;
+                if (fL < 0) fL = 0; if (fT < 0) fT = 0; if (fL > max) fL = max; if (fT > max) fT = max;
+                el.style.left = fL + '%'; el.style.top = fT + '%';
+            };
+        };
+    }
+
+    field.ontouchstart = function(e) {
+        if (e.target === field || e.target.id === 'center-circle' || e.target.id.indexOf('penalty') !== -1) selectPlayer(null);
+    };
+</script>
+</body>
+</html>
