@@ -3,7 +3,7 @@ name: Build Android APK (Bubblewrap)
 on:
   push:
     branches:
-      - main  # Oder 'master', je nachdem wie dein Haupt-Branch heißt
+      - main  # Oder master, falls dein Branch so heißt
 
 jobs:
   build:
@@ -16,18 +16,18 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-size: 18
+        node-version: 18
 
     - name: Install Bubblewrap CLI
       run: npm install -g @bubblewrap/cli
 
-    - name: Initialize and Build APK
+    - name: Initialize and Build APK (Automated)
       run: |
-        # Bubblewrap braucht ein paar Grundeinstellungen. 
-        # Wir füttern das Tool mit den Daten aus deiner manifest.json
-        # Das Tool generiert daraus das Android-Projekt und die APK
-        bubblewrap init --manifest=./manifest.json --metaInfo=./twa-manifest.json
-        bubblewrap build --acceptToS
+        # Wir erstellen eine automatisierte Konfiguration, damit Bubblewrap keine Fragen stellt
+        bubblewrap init --manifest=./manifest.json --metaInfo=./twa-manifest.json --yes
+        
+        # Build-Prozess mit automatischen Bestätigungen ausführen
+        bubblewrap build --acceptToS --yes
         
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
