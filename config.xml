@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="de.tacticboard.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>TacticBoard</name>
+    <description>Offline-Taktiktafel für das Sport-Training</description>
+    <author email="info@taktiktafel.de" href="http://taktiktafel.de">Simon Mählmann</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    
+    <platform name="android">
+        <icon src="image.png" />
+    </platform>
+</widget>
+ches Bild das Logo ist -->
+        <icon src="icon.png" />
+    </platform>
+</widget>

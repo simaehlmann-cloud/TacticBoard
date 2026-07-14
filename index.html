@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>TacticBoard</title>
+
+<link rel="icon" type="image/png" href="image.png">
+<link rel="apple-touch-icon" href="image.png">
+<link rel="manifest" href="manifest.json">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+:root {
+    --field-green:#4caf50;
+    --ui-dark:#1d3557;
+    --control-bg:#333;
+    --cone-color:#ff9f1c;
+    --draw-color-1:#e63946;
+    --draw-color-2:#0077cc;
+}
+
+html, body {
+    margin:0;
+    padding:0;
+    background:#222;
+    color:#fff;
+    font-family:Arial,Helvetica,sans-serif;
+    height:100%;
+    overflow-x:hidden;
+}
+
+/* HEADER & DROPDOWN */
+.header {
+    width:100%; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; box-sizing:border-box; background: #1a1a1a; border-bottom: 1px solid rgba(255,255,255,0.1); touch-action: manipulation;
+}
+
+.title-container { position: relative; }
+#appName { font-size:26px; font-weight:800; cursor:pointer; display: flex; align-items: center; gap: 8px; }
+#appName::after { content: '▼'; font-size: 14px; color: #aaa; }
+
+#sportPickerMenu {
+    position:absolute; top: 40px; left: 0; z-index:1200; display:none; background:#2a9d8f; padding:12px; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.6); min-width: 160px; animation: fadeIn 0.2s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+.sport-btn-left {
+    background: #1d3557; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 10px 14px; text-align: left; width: 100%; border-radius: 6px; margin-bottom: 6px; transition: background 0.2s;
+}
+.sport-btn-left:last-child { margin-bottom: 0; }
+.sport-btn-left:hover { background: #264673; }
+
+#langFlags { display:flex; gap:10px; }
+#langFlags img { width:32px; height:20px; cursor:pointer; border-radius:4px; border:2px solid rgba(255,255,255,0.2); transition: opacity 0.2s; }
+
+/* MAIN */
+.container { width:100%; max-width:900px; margin:0 auto; padding:0 16px 120px 16px; box-sizing:border-box; }
+
+/* CONTROLS (SETUP ABOVE FIELD) */
+#setup-controls {
+    background:var(--control-bg); padding:12px 16px; border-radius:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 16px; touch-action: manipulation;
+}
+
+/* FIELD WRAPPER */
+#zoom-wrapper {
+    width:100%; display:flex; justify-content:center; align-items:center; transform-origin:center top; margin-top:16px; margin-bottom:16px; transition: transform 0.1s ease-out;
+}
+
+/* FIELD */
+#football-field {
+    width:100%; aspect-ratio: 3/2; position:relative; border-radius:12px; overflow:hidden; background:var(--field-green); border:3px solid #fff; box-shadow:0 6px 18px rgba(0,0,0,.5); touch-action:none;
+}
+.field-svg-overlay, #drawing-canvas { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:1; }
+#drawing-canvas { z-index:4; }
+
+/* CONTROLS (TOOLS BELOW FIELD) */
+#tools-controls {
+    background:var(--control-bg); padding:16px; border-radius:12px; display:flex; flex-direction:column; gap:12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); touch-action: manipulation;
+}
+
+.row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.grow { flex:1; min-width:120px; }
+
+input[type="text"], select { padding: 10px; border-radius: 6px; border: none; font-size: 14px; box-sizing: border-box; outline: none; }
+input[type="text"]:focus { box-shadow: 0 0 0 2px #4caf50; }
+
+button {
+    padding:10px 14px; border:none; border-radius:8px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; color: white; transition: filter 0.2s, transform 0.1s;
+}
+button:hover:not(:disabled) { filter: brightness(1.15); }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity:0.35; cursor:not-allowed; filter:none; }
+
+#action-btn {background:#e63946;} #enemy-btn {background:#1d3557;border:1px solid #fff;}
+#ball-btn {background:#fff;color:#000;border:1px solid #000;} #item-btn {background:#2b8a3e;} #cone-btn {background:#444;color:var(--cone-color);font-size:16px;}
+#clear-all-btn {background:#555;} #draw-toggle-btn {background:#555;} #line-style-btn {background:#555;} #eraser-btn {background:#666;}
+#undo-draw-btn {background:#457b9d;}
+#color1-btn, #color2-btn { width:36px; height:36px; border-radius:6px; border:2px solid #fff; cursor:pointer; }
+#color1-btn {background:var(--draw-color-1);} #color2-btn {background:var(--draw-color-2);}
+#clear-drawings-btn {background:#d68c45;display:none;} #add-arrow-btn {background:#f4a261;display:none;} #delete-btn {background:#b70909;display:none;}
+#save-btn { background-color: #2a9d8f; } #delete-tactic-btn { background-color: #555; } #export-img-btn { background-color: #9c27b0; }
+
+.zoom-row { display:flex; align-items:center; gap:10px; background:#444; padding:10px; border-radius:8px; }
+.zoom-row input { flex:1; cursor: pointer; }
+#eraser-size-slider, #pen-size-slider { width:90px; cursor:pointer; }
+
+/* PLAYER OBJECTS */
+.player {
+    position:absolute; width:9%; aspect-ratio:1/1; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 12px; color:#fff; border:2px solid #fff; background:#e63946; z-index:10; touch-action:none; box-sizing: border-box; box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+}
+.player.enemy {background:#1d3557;}
+.player.active { border-color: #ffeb3b; box-shadow: 0 0 12px #ffeb3b; }
+.player.ball { width:7%; background:#fff; color:#000; border:1px solid #000; font-size: 14px; }
+.player.ball.handball { background: #e63946; color: #fff; border: 1px dashed #fff; font-size: 10px; width: 6%; }
+.player.puck { width:6%; background:#000; color:#fff; border-radius:50%; font-size: 10px; }
+.player.cone { background:transparent; border:none; font-size:24px; width:8%; box-shadow: none; font-weight: normal; }
+
+/* ITEMS (Goal, Basket, Net) */
+.player.item-obj { width:14%; height:8%; background:transparent; border:none; box-shadow: none; border-radius: 0; z-index: 8; }
+.item-img { width:100%; height:100%; object-fit:contain; pointer-events:none; }
+
+/* ITEM RESIZE HANDLE */
+.item-resize-handle { display: none; position: absolute; right: -12px; bottom: -12px; width: 24px; height: 24px; background: rgba(255, 255, 255, 0.9); border: 2px solid #2b8a3e; border-radius: 50%; cursor: nwse-resize; z-index: 20; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+.player.item-obj.active .item-resize-handle { display: block; }
+
+/* ARROWS */
+.arrow-container { position:absolute; height:20px; display:flex; align-items:center; z-index:9; touch-action:none; transform-origin: left center; }
+.arrow-line-body { flex:1; height:4px; background:#f4a261; border-radius:4px 0 0 4px; }
+.arrow-tip { width:0; height:0; border-top:8px solid transparent; border-bottom:8px solid transparent; border-left:14px solid #f4a261; }
+.arrow-handle { display: none; width:24px; height:24px; border-radius:50%; background:rgba(255, 255, 255, 0.9); border:2px solid #f4a261; margin-left:2px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+.arrow-container.active .arrow-line-body, .arrow-container.active .arrow-tip { filter: drop-shadow(0 0 3px #00f0ff); }
+.arrow-container.active .arrow-handle { display: block; border-color: #00f0ff; }
+
+/* FOOTER */
+footer { position:fixed; bottom:0; left:0; right:0; width:100%; padding:12px; background:rgba(0,0,0,0.9); display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.1); z-index: 1000; box-sizing: border-box; touch-action: manipulation; }
+.dev-credits { font-size: 12px; color: #aaa; }
+footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); color:#fff; padding:8px 14px; border-radius:8px; }
+
+/* MODALS */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); display:none; align-items:center; justify-content:center; z-index:2000; backdrop-filter: blur(3px); touch-action: manipulation;}
+.modal-content { background:#1d3557; padding:24px; border-radius:12px; max-width:400px; width: 90%; max-height:80vh; overflow-y:auto; text-align:center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); box-sizing:border-box; border: 1px solid rgba(255,255,255,0.1); }
+.modal-title { font-weight:bold; font-size:22px; margin-bottom:15px; color: #4caf50;}
+.modal-text { font-size: 14px; line-height: 1.6; margin-bottom: 20px; text-align: left;}
+
+/* TOAST NOTIFICATION */
+#toast { visibility: hidden; min-width: 250px; background-color: #2a9d8f; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s, bottom 0.3s ease-out; box-shadow: 0 4px 12px rgba(0,0,0,0.4); font-weight: bold; }
+#toast.show { visibility: visible; opacity: 1; bottom: 80px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="title-container">
+        <div id="appName">TacticBoard</div>
+        <div id="sportPickerMenu">
+          <button class="sport-btn-left" data-sport="football">Fußball</button>
+          <button class="sport-btn-left" data-sport="basketball">Basketball</button>
+          <button class="sport-btn-left" data-sport="handball">Handball</button>
+          <button class="sport-btn-left" data-sport="volleyball">Volleyball</button>
+          <button class="sport-btn-left" data-sport="icehockey">Eishockey</button>
+        </div>
+    </div>
+    <div id="langFlags">
+        <img id="flag-de" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='18'><rect width='28' height='6' y='0' fill='%23000000'/><rect width='28' height='6' y='6' fill='%23DD0000'/><rect width='28' height='6' y='12' fill='%23FFCE00'/></svg>" />
+        <img id="flag-en" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='18' viewBox='0 0 60 30'><rect width='60' height='30' fill='%23003A7A'/><g stroke='%23fff' stroke-width='6'><line x1='0' y1='0' x2='60' y2='30'/><line x1='60' y1='0' x2='0' y2='30'/></g><g stroke='%23C8102E' stroke-width='4'><line x1='0' y1='0' x2='60' y2='30'/><line x1='60' y1='0' x2='0' y2='30'/></g><rect x='24' y='0' width='12' height='30' fill='%23fff'/><rect x='0' y='9' width='60' height='12' fill='%23fff'/><rect x='26' y='0' width='8' height='30' fill='%23C8102E'/><rect x='0' y='11' width='60' height='8' fill='%23C8102E'/></svg>" />
+    </div>
+</div>
+
+<div class="container">
+    <div id="setup-controls">
+        <input id="name-input" class="grow" type="text" placeholder="Nr/Name" />
+        <button id="action-btn" title="Spieler">🔴</button>
+        <button id="enemy-btn" title="Gegner">🔵</button>
+    </div>
+
+    <div id="zoom-wrapper">
+        <div id="football-field">
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+    </div>
+
+    <div id="tools-controls">
+        <div class="row">
+            <button id="ball-btn">⚽ Ball</button>
+            <button id="item-btn">🥅 Tor</button>
+            <button id="cone-btn">▲ Hütchen</button>
+        </div>
+
+        <div class="row">
+            <button id="draw-toggle-btn">✏️ Malen</button>
+            <input id="pen-size-slider" type="range" min="2" max="12" value="4" style="display:none;" title="Stiftbreite" />
+            <button id="eraser-btn">🧽 Radierer</button>
+            <input id="eraser-size-slider" type="range" min="10" max="60" value="24" style="display:none;" title="Radiergröße" />
+            <div id="color1-btn"></div>
+            <div id="color2-btn"></div>
+            <button id="line-style-btn">▬ Durchgehend</button>
+        </div>
+
+        <div class="row">
+            <button id="undo-draw-btn">↩️ Rückgängig</button>
+            <button id="clear-drawings-btn">🧹 Zeichnung löschen</button>
+            <button id="add-arrow-btn">➦ Pfeil</button>
+            <button id="delete-btn">🗑️ Objekt löschen</button>
+            <button id="clear-all-btn">🔄 Alles löschen</button>
+        </div>
+
+        <div class="zoom-row">
+            <span id="zoomLabel">Größe anpassen:</span>
+            <input id="size-slider" type="range" min="60" max="150" value="100" />
+        </div>
+
+        <div class="row">
+            <input id="tactic-name-input" class="grow" type="text" placeholder="Taktikname..." />
+            <select id="tactic-select" class="grow"></select>
+        </div>
+
+        <div class="row">
+            <button id="save-btn">💾 Speichern</button>
+            <button id="delete-tactic-btn">🗑️ Löschen</button>
+            <button id="export-img-btn">🖼️ Als Bild speichern</button>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <div class="dev-credits" id="dev-credits-text">Entwickelt von <strong>Simon Mählmann</strong></div>
+    <button id="about-footer-btn">Über TacticBoard</button>
+</footer>
+
+<div id="custom-confirm" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-title">Wirklich alles löschen?</div>
+    <div style="display:flex;justify-content:center;gap:15px;">
+      <button id="confirm-yes" style="background:#e63946; padding: 10px 20px;">Ja</button>
+      <button id="confirm-no" style="background:#555; padding: 10px 20px;">Nein</button>
+    </div>
+  </div>
+</div>
+
+<div id="about-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-title">Über TacticBoard</div>
+    <div class="modal-text" id="about-text">
+        <strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
+        Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Tore, Körbe und Netze lassen sich am Eck-Griff in der Größe ändern. <br><br>
+        <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
+        <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
+        Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
+        Entwickelt von <strong>Simon Mählmann</strong>.
+    </div>
+    <button id="close-about-btn" style="background:#2a9d8f; width: 100%; justify-content:center;">Schließen</button>
+  </div>
+</div>
+
+<div id="toast">Nachricht</div>
+
+<script>
+const field = document.getElementById('football-field');
+const canvas = document.getElementById('drawing-canvas');
+const ctx = canvas.getContext('2d');
+
+const nameInput = document.getElementById('name-input');
+const actionBtn = document.getElementById('action-btn');
+const enemyBtn = document.getElementById('enemy-btn');
+const ballBtn = document.getElementById('ball-btn');
+const itemBtn = document.getElementById('item-btn');
+const coneBtn = document.getElementById('cone-btn');
+
+const drawToggleBtn = document.getElementById('draw-toggle-btn');
+const penSizeSlider = document.getElementById('pen-size-slider');
+const eraserBtn = document.getElementById('eraser-btn');
+const eraserSizeSlider = document.getElementById('eraser-size-slider');
+const color1Btn = document.getElementById('color1-btn');
+const color2Btn = document.getElementById('color2-btn');
+const lineStyleBtn = document.getElementById('line-style-btn');
+const undoDrawBtn = document.getElementById('undo-draw-btn');
+const clearDrawingsBtn = document.getElementById('clear-drawings-btn');
+
+const addArrowBtn = document.getElementById('add-arrow-btn');
+const deleteBtn = document.getElementById('delete-btn');
+const clearAllBtn = document.getElementById('clear-all-btn');
+
+const sizeSlider = document.getElementById('size-slider');
+const zoomWrapper = document.getElementById('zoom-wrapper');
+
+const tacticNameInput = document.getElementById('tactic-name-input');
+const tacticSelect = document.getElementById('tactic-select');
+const saveBtn = document.getElementById('save-btn');
+const deleteTacticBtn = document.getElementById('delete-tactic-btn');
+const exportImgBtn = document.getElementById('export-img-btn');
+
+const aboutFooterBtn = document.getElementById('about-footer-btn');
+const appNameEl = document.getElementById('appName');
+const sportPickerMenu = document.getElementById('sportPickerMenu');
+const zoomLabelEl = document.getElementById('zoomLabel');
+const devCreditsEl = document.getElementById('dev-credits-text');
+const aboutTextEl = document.getElementById('about-text');
+const flagDe = document.getElementById('flag-de');
+const flagEn = document.getElementById('flag-en');
+const toastEl = document.getElementById('toast');
+
+const customConfirm = document.getElementById('custom-confirm');
+const confirmYes = document.getElementById('confirm-yes');
+const confirmNo = document.getElementById('confirm-no');
+const aboutModal = document.getElementById('about-modal');
+const closeAboutBtn = document.getElementById('close-about-btn');
+
+let isDrawingMode = false;
+let isErasing = false;
+let currentColor = getComputedStyle(document.documentElement).getPropertyValue('--draw-color-1').trim();
+let currentLineStyle = 'solid';
+let eraserRadius = 24;
+let penWidth = 4;
+let drawing = false;
+let activePlayer = null, activeArrow = null;
+let redCounter = 0, enemyCounter = 0;
+let currentSport = 'football';
+let LANG = 'de';
+
+const ballIcons = { football: '⚽', basketball: '🏀', volleyball: '🏐', icehockey: '⚫', handball: '🔴' };
+
+function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.className = "show";
+    clearTimeout(toastEl._timer);
+    toastEl._timer = setTimeout(() => { toastEl.className = toastEl.className.replace("show", ""); }, 3000);
+}
+
+function sizePercentFor(className){
+    if(className.includes('item-obj')) return 14;
+    if(className.includes('cone')) return 8;
+    if(className.includes('puck')) return 6;
+    if(className.includes('handball')) return 6;
+    if(className.includes('ball')) return 7;
+    return 9;
+}
+
+/* ---------------------------------------------------
+   CANVAS RESIZE
+--------------------------------------------------- */
+function resizeCanvas(){
+    canvas.width = field.clientWidth;
+    canvas.height = field.clientHeight;
+    redrawCanvas();
+}
+window.addEventListener('load', resizeCanvas);
+window.addEventListener('resize', resizeCanvas);
+
+/* ---------------------------------------------------
+   DRAWING (VEKTOR) + UNDO HISTORY
+--------------------------------------------------- */
+const MAX_HISTORY = 30;
+let actionHistory = [];
+let drawingStrokes = [];
+let currentStroke = null;
+let legacyBackgroundImage = null;
+
+function redrawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if(legacyBackgroundImage){
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.setLineDash([]);
+        ctx.drawImage(legacyBackgroundImage, 0, 0, canvas.width, canvas.height);
+    }
+    for(let stroke of drawingStrokes) {
+        if(!stroke.points || stroke.points.length === 0) continue;
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.lineWidth = stroke.width;
+        ctx.strokeStyle = stroke.color === 'erase' ? 'rgba(0,0,0,1)' : stroke.color;
+        ctx.globalCompositeOperation = stroke.color === 'erase' ? 'destination-out' : 'source-over';
+        ctx.setLineDash(stroke.style === 'dashed' ? [12,8] : []);
+
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
+
+        if(stroke.points.length < 3) {
+            for(let i=1; i<stroke.points.length; i++) {
+                ctx.lineTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height);
+            }
+        } else {
+            for (let i = 1; i < stroke.points.length - 1; i++) {
+                let xc = (stroke.points[i].x * canvas.width + stroke.points[i + 1].x * canvas.width) / 2;
+                let yc = (stroke.points[i].y * canvas.height + stroke.points[i + 1].y * canvas.height) / 2;
+                ctx.quadraticCurveTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height, xc, yc);
+            }
+            let last = stroke.points[stroke.points.length-1];
+            let secondLast = stroke.points[stroke.points.length-2];
+            ctx.quadraticCurveTo(secondLast.x * canvas.width, secondLast.y * canvas.height, last.x * canvas.width, last.y * canvas.height);
+        }
+        ctx.stroke();
+    }
+}
+
+function pushCanvasHistory(){
+    actionHistory.push({ type:'canvas', data: JSON.parse(JSON.stringify(drawingStrokes)) });
+    trimHistory();
+}
+function pushDeleteHistory(el){
+    if(el.classList.contains('arrow-container')){
+        actionHistory.push({ type:'arrow', data:{
+            left: el.style.left, top: el.style.top, width: el.style.width,
+            angle: el.getAttribute('data-angle') || '0',
+            color: el.dataset.color || '', dashed: el.dataset.dashed || 'false'
+        }});
+    } else {
+        const isMovableObj = !el.className.includes('ball') && !el.className.includes('cone');
+        actionHistory.push({ type:'player', data:{
+            className: el.className, text: el.dataset.text || el.innerText,
+            left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height,
+            color: el.dataset.color || el.style.color,
+            movable: isMovableObj
+        }});
+    }
+    trimHistory();
+}
+function trimHistory(){
+    if(actionHistory.length > MAX_HISTORY) actionHistory.shift();
+    updateUndoState();
+}
+function undoLast(){
+    if(actionHistory.length === 0) return;
+    const action = actionHistory.pop();
+    if(action.type === 'canvas'){
+        drawingStrokes = action.data;
+        redrawCanvas();
+    } else if(action.type === 'arrow'){
+        const a = action.data;
+        const arrow = buildArrowOnField(a.left, a.top, a.width, a.angle, a.color, a.dashed === 'true');
+        arrow.setAttribute('data-angle', a.angle); arrow.style.transform = 'rotate('+a.angle+'deg)';
+    } else if(action.type === 'player'){
+        const p = action.data;
+        const el = createObject(p.className, p.text, p.left, p.top, sizePercentFor(p.className), p.movable, p.width, p.height, p.color);
+        if(p.className.includes('player') && p.movable) setupDoubleClickToggle(el);
+    }
+    updateUndoState();
+}
+function clearHistory(){
+    actionHistory = [];
+    drawingStrokes = [];
+    legacyBackgroundImage = null;
+    updateUndoState();
+}
+function updateUndoState(){
+    undoDrawBtn.disabled = actionHistory.length === 0;
+}
+undoDrawBtn.addEventListener('click', undoLast);
+
+function getEventPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+        x: (clientX - rect.left) / rect.width,
+        y: (clientY - rect.top) / rect.height
+    };
+}
+
+function startDraw(e){
+    if(!isDrawingMode) return;
+    if(e.cancelable) e.preventDefault();
+    pushCanvasHistory();
+    drawing = true;
+    
+    const pos = getEventPos(e);
+    
+    currentStroke = {
+        color: isErasing ? 'erase' : currentColor,
+        width: isErasing ? eraserRadius : penWidth,
+        style: isErasing ? 'solid' : currentLineStyle,
+        points: [pos]
+    };
+    drawingStrokes.push(currentStroke);
+    redrawCanvas();
+}
+
+// BUGFIX: Zeichnet die Linie als Ganzes neu, damit die Strichelung sofort korrekt dargestellt wird
+function moveDraw(e){
+    if(!isDrawingMode || !drawing) return;
+    if(e.cancelable) e.preventDefault();
+    
+    const pos = getEventPos(e);
+    currentStroke.points.push(pos);
+    
+    redrawCanvas();
+}
+
+function endDraw(e){ if(isDrawingMode) drawing = false; }
+canvas.addEventListener('touchstart', startDraw, {passive: false}); canvas.addEventListener('touchmove', moveDraw, {passive: false});
+canvas.addEventListener('touchend', endDraw); canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', moveDraw); canvas.addEventListener('mouseup', endDraw); canvas.addEventListener('mouseleave', endDraw);
+
+function updateToolSliders(){
+    penSizeSlider.style.display = (isDrawingMode && !isErasing) ? 'inline-block' : 'none';
+    eraserSizeSlider.style.display = (isDrawingMode && isErasing) ? 'inline-block' : 'none';
+}
+const createBtns = [actionBtn, enemyBtn, ballBtn, itemBtn, coneBtn];
+drawToggleBtn.addEventListener('click', () => {
+    isDrawingMode = !isDrawingMode;
+    if(isDrawingMode){
+        canvas.style.pointerEvents = 'auto'; 
+        drawToggleBtn.style.background = '#ffeb3b'; drawToggleBtn.style.color = '#000'; 
+        drawToggleBtn.innerHTML = translations[LANG].doneBtn;
+        selectPlayer(null);
+        createBtns.forEach(b => { b.disabled = true; });
+    } else {
+        canvas.style.pointerEvents = 'none'; 
+        drawToggleBtn.style.background = '#555'; drawToggleBtn.style.color = '#fff';
+        drawToggleBtn.innerHTML = translations[LANG].drawBtn;
+        createBtns.forEach(b => { b.disabled = false; });
+        if(isErasing) {
+            isErasing = false; 
+            eraserBtn.style.background = '#666'; eraserBtn.style.color = '#fff';
+        }
+    }
+    updateToolSliders(); updateButtonVisibility(); updateUndoState();
+});
+eraserBtn.addEventListener('click', () => {
+    if(!isDrawingMode) return;
+    isErasing = !isErasing; eraserBtn.style.background = isErasing ? '#e9c46a' : '#666'; eraserBtn.style.color = isErasing ? '#000' : '#fff';
+    updateToolSliders();
+});
+penSizeSlider.addEventListener('input', () => { penWidth = parseInt(penSizeSlider.value, 10); });
+eraserSizeSlider.addEventListener('input', () => { eraserRadius = parseInt(eraserSizeSlider.value, 10); });
+
+function applyColorToSelected(){
+    if(activeArrow){ activeArrow.dataset.color = currentColor; applyArrowVisual(activeArrow); }
+    if(activePlayer && activePlayer.classList.contains('cone')){
+        activePlayer.style.color = currentColor; activePlayer.dataset.color = currentColor;
+    }
+}
+color1Btn.addEventListener('click', () => {
+    currentColor = getComputedStyle(document.documentElement).getPropertyValue('--draw-color-1').trim();
+    isErasing = false; eraserBtn.style.background = '#666'; eraserBtn.style.color = '#fff'; updateToolSliders();
+    applyColorToSelected();
+});
+color2Btn.addEventListener('click', () => {
+    currentColor = getComputedStyle(document.documentElement).getPropertyValue('--draw-color-2').trim();
+    isErasing = false; eraserBtn.style.background = '#666'; eraserBtn.style.color = '#fff'; updateToolSliders();
+    applyColorToSelected();
+});
+lineStyleBtn.addEventListener('click', () => {
+    currentLineStyle = currentLineStyle === 'solid' ? 'dashed' : 'solid';
+    lineStyleBtn.innerHTML = currentLineStyle === 'dashed' ? translations[LANG].lineDashed : translations[LANG].lineSolid;
+    if(activeArrow){ activeArrow.dataset.dashed = (currentLineStyle === 'dashed') ? 'true' : 'false'; applyArrowVisual(activeArrow); }
+});
+clearDrawingsBtn.addEventListener('click', () => { pushCanvasHistory(); drawingStrokes = []; legacyBackgroundImage = null; redrawCanvas(); });
+
+/* ---------------------------------------------------
+   OBJEKTE ERSTELLEN & SKALIEREN
+--------------------------------------------------- */
+function getConeColor(sport){ return sport === 'basketball' ? '#2196f3' : getComputedStyle(document.documentElement).getPropertyValue('--cone-color').trim(); }
+
+function createObject(className, text, left, top, sizePercent, selectable, wPercent=null, hPercent=null, objColor=null){
+    const el = document.createElement('div');
+    el.className = className; el.style.left = left; el.style.top = top;
+    el.isSelectable = selectable; el.dataset.text = text;
+
+    if (wPercent) el.style.width = wPercent;
+    if (hPercent) el.style.height = hPercent;
+
+    if (className.includes('cone')) {
+        el.innerText = '▲'; 
+        el.style.color = objColor || getConeColor(currentSport);
+        el.dataset.color = el.style.color;
+        setupPercentDrag(el, sizePercent); field.appendChild(el); return el;
+    }
+    if (className.includes('puck')) { el.innerText = text; setupPercentDrag(el, 6); field.appendChild(el); return el; }
+    if (className.includes('item-obj')) {
+        let svg = '';
+        if (currentSport === 'basketball') {
+            svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><path d="M10,50 Q50,90 90,50" fill="none" stroke="#f4a261" stroke-width="6"/><line x1="20" y1="50" x2="80" y2="50" stroke="#f4a261" stroke-width="6"/><rect x="25" y="10" width="50" height="40" fill="none" stroke="#fff" stroke-width="6"/></svg>');
+        } else if (currentSport === 'volleyball') {
+            svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 40"><rect width="100" height="40" fill="none" stroke="#fff" stroke-width="4"/><line x1="0" y1="10" x2="100" y2="10" stroke="#ccc" stroke-width="2"/><line x1="0" y1="20" x2="100" y2="20" stroke="#ccc" stroke-width="2"/><line x1="0" y1="30" x2="100" y2="30" stroke="#ccc" stroke-width="2"/><line x1="10" y1="0" x2="10" y2="40" stroke="#ccc" stroke-width="2"/><line x1="30" y1="0" x2="30" y2="40" stroke="#ccc" stroke-width="2"/><line x1="50" y1="0" x2="50" y2="40" stroke="#ccc" stroke-width="2"/><line x1="70" y1="0" x2="70" y2="40" stroke="#ccc" stroke-width="2"/><line x1="90" y1="0" x2="90" y2="40" stroke="#ccc" stroke-width="2"/></svg>');
+        } else {
+            svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 120 60"><rect x="2" y="18" width="116" height="24" fill="#ffffff" stroke="#222" stroke-width="3"/><rect x="6" y="22" width="8" height="16" fill="#222"/><rect x="106" y="22" width="8" height="16" fill="#222"/></svg>');
+        }
+        el.innerHTML = `<img class="item-img" src="data:image/svg+xml;utf8,${svg}" /><div class="item-resize-handle"></div>`;
+        setupPercentDrag(el, 14); setupItemResize(el); field.appendChild(el); return el;
+    }
+
+    el.innerText = text || ''; setupPercentDrag(el, sizePercent); field.appendChild(el); return el;
+}
+
+function setupItemResize(el) {
+    const handle = el.querySelector('.item-resize-handle');
+    if(!handle) return;
+    function startResize(e) {
+        e.stopPropagation(); if(e.cancelable) e.preventDefault(); selectPlayer(el);
+        const startX = e.touches ? e.touches[0].clientX : e.clientX; const startY = e.touches ? e.touches[0].clientY : e.clientY;
+        const startW = parseFloat(el.style.width) || (el.clientWidth / field.clientWidth * 100); const startH = parseFloat(el.style.height) || (el.clientHeight / field.clientHeight * 100);
+        function moveResize(ev) {
+            const curX = ev.touches ? ev.touches[0].clientX : ev.clientX; const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            const scale = parseInt(sizeSlider.value, 10) / 100;
+            const dX = (curX - startX) / scale; const dY = (curY - startY) / scale;
+            let newW = startW + (dX / field.clientWidth) * 100; let newH = startH + (dY / field.clientHeight) * 100;
+            if(newW < 5) newW = 5; if(newH < 2) newH = 2; 
+            el.style.width = newW + '%'; el.style.height = newH + '%';
+        }
+        function endResize() {
+            document.removeEventListener('touchmove', moveResize); document.removeEventListener('mousemove', moveResize);
+            document.removeEventListener('touchend', endResize); document.removeEventListener('mouseup', endResize);
+        }
+        document.addEventListener('touchmove', moveResize, {passive: false}); document.addEventListener('mousemove', moveResize);
+        document.addEventListener('touchend', endResize); document.addEventListener('mouseup', endResize);
+    }
+    handle.addEventListener('touchstart', startResize, {passive: false}); handle.addEventListener('mousedown', startResize);
+}
+
+actionBtn.addEventListener('click', () => {
+    let name = nameInput.value.trim(); if (!name) { redCounter++; name = redCounter; }
+    const p = createObject('player', name, '35%', '45%', 9, true); setupDoubleClickToggle(p); selectPlayer(p); nameInput.value = '';
+});
+enemyBtn.addEventListener('click', () => {
+    let name = nameInput.value.trim(); if (!name) { enemyCounter++; name = enemyCounter; }
+    const p = createObject('player enemy', name, '55%', '45%', 9, true); setupDoubleClickToggle(p); selectPlayer(p); nameInput.value = '';
+});
+ballBtn.addEventListener('click', () => {
+    let icon = ballIcons[currentSport] || '⚽'; let cls = 'player ball'; let size = 7;
+    if (currentSport === 'icehockey') { cls += ' puck'; size = 6; }
+    if (currentSport === 'handball') { cls += ' handball'; icon = ''; size = 6; }
+    createObject(cls, icon, '46%', '52%', size, false);
+});
+itemBtn.addEventListener('click', () => {
+    let w = '14%'; let h = '8%';
+    if(currentSport === 'volleyball') { w = '30%'; h = '4%'; }
+    if(currentSport === 'basketball') { w = '10%'; h = '10%'; }
+    createObject('player item-obj', '', '46%', '12%', 14, true, w, h);
+});
+coneBtn.addEventListener('click', () => createObject('player cone', '▲', '46%', '60%', 8, false));
+
+/* ---------------------------------------------------
+   DRAG & DROP
+--------------------------------------------------- */
+function setupPercentDrag(el, size) {
+    let sX = 0, sY = 0, sL = 0, sT = 0;
+    function startDrag(e) {
+        if (isDrawingMode) return;
+        const node = e.target.nodeName.toLowerCase();
+        if (node !== 'button' && node !== 'input' && e.cancelable) e.preventDefault();
+        selectPlayer(el);
+        sX = e.touches ? e.touches[0].clientX : e.clientX; sY = e.touches ? e.touches[0].clientY : e.clientY;
+        sL = parseFloat(el.style.left) || 0; sT = parseFloat(el.style.top) || 0;
+        function moveDrag(ev) {
+            const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            const scale = parseInt(sizeSlider.value, 10) / 100;
+            let fL = sL + ((cX - sX) / scale / field.clientWidth) * 100;
+            let fT = sT + ((cY - sY) / scale / field.clientHeight) * 100;
+            const max = 100 - size;
+            if (fL < 0) fL = 0; if (fT < 0) fT = 0; if (fL > max) fL = max; if (fT > max) fT = max;
+            el.style.left = fL + '%'; el.style.top = fT + '%';
+        }
+        function endDrag() {
+            document.removeEventListener('touchmove', moveDrag); document.removeEventListener('touchend', endDrag);
+            document.removeEventListener('mousemove', moveDrag); document.removeEventListener('mouseup', endDrag);
+        }
+        document.addEventListener('touchmove', moveDrag, { passive:false }); document.addEventListener('touchend', endDrag);
+        document.addEventListener('mousemove', moveDrag); document.addEventListener('mouseup', endDrag);
+    }
+    el.addEventListener('touchstart', startDrag, { passive: false }); el.addEventListener('mousedown', startDrag);
+}
+
+function setupDoubleClickToggle(el) {
+    let lastTap = 0;
+    function handleTap(e) {
+        if (isDrawingMode) return; const now = Date.now();
+        if (now - lastTap < 300 && now - lastTap > 0) { el.classList.toggle('enemy'); if (e.cancelable) e.preventDefault(); }
+        lastTap = now;
+    }
+    el.addEventListener('touchstart', handleTap); el.addEventListener('mousedown', handleTap);
+}
+
+/* ---------------------------------------------------
+   PFEILE
+--------------------------------------------------- */
+addArrowBtn.addEventListener('click', () => {
+    if (!activePlayer) return;
+    const pL = parseFloat(activePlayer.style.left) || 40; const pT = parseFloat(activePlayer.style.top) || 40;
+    const arrow = buildArrowOnField((pL + 4) + '%', (pT + 3) + '%', '70px', '0', currentColor, currentLineStyle === 'dashed'); selectArrow(arrow);
+});
+function applyArrowVisual(arrow){
+    const color = arrow.dataset.color || currentColor;
+    const dashed = arrow.dataset.dashed === 'true';
+    const body = arrow.querySelector('.arrow-line-body');
+    const tip = arrow.querySelector('.arrow-tip');
+    if(dashed){
+        body.style.background = 'transparent';
+        body.style.height = '0px';
+        body.style.borderBottom = '4px dashed ' + color;
+    } else {
+        body.style.background = color;
+        body.style.height = '4px';
+        body.style.borderBottom = 'none';
+    }
+    tip.style.borderLeftColor = color;
+}
+function buildArrowOnField(left, top, width, angle, color, dashed) {
+    const arrow = document.createElement('div');
+    arrow.className = 'arrow-container'; arrow.style.left = left; arrow.style.top = top; arrow.style.width = width;
+    arrow.setAttribute('data-angle', angle); arrow.style.transform = 'rotate(' + angle + 'deg)';
+    arrow.dataset.color = color || currentColor; arrow.dataset.dashed = dashed ? 'true' : 'false';
+    arrow.innerHTML = `<div class="arrow-line-body"></div><div class="arrow-tip"></div><div class="arrow-handle"></div>`;
+    field.appendChild(arrow); setupArrowControls(arrow); applyArrowVisual(arrow); return arrow;
+}
+function setupArrowControls(arrow) {
+    const handle = arrow.querySelector('.arrow-handle');
+    function startArrowDrag(e) {
+        if (e.target === handle || isDrawingMode) return; e.stopPropagation(); selectArrow(arrow);
+        const sX = e.touches ? e.touches[0].clientX : e.clientX; const sY = e.touches ? e.touches[0].clientY : e.clientY;
+        const sL = parseFloat(arrow.style.left) || 0; const sT = parseFloat(arrow.style.top) || 0;
+        function moveDrag(ev) {
+            const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            const scale = parseInt(sizeSlider.value, 10) / 100;
+            arrow.style.left = (sL + ((cX - sX) / scale / field.clientWidth) * 100) + '%';
+            arrow.style.top = (sT + ((cY - sY) / scale / field.clientHeight) * 100) + '%';
+        }
+        function endDrag() {
+            document.removeEventListener('touchmove', moveDrag); document.removeEventListener('touchend', endDrag);
+            document.removeEventListener('mousemove', moveDrag); document.removeEventListener('mouseup', endDrag);
+        }
+        document.addEventListener('touchmove', moveDrag, { passive:false }); document.addEventListener('touchend', endDrag);
+        document.addEventListener('mousemove', moveDrag); document.addEventListener('mouseup', endDrag);
+    }
+    arrow.addEventListener('touchstart', startArrowDrag); arrow.addEventListener('mousedown', startArrowDrag);
+
+    function startHandleDrag(e) {
+        e.stopPropagation(); if(e.cancelable) e.preventDefault(); selectArrow(arrow);
+        const rect = field.getBoundingClientRect();
+        const pivotX = rect.left + (parseFloat(arrow.style.left)/100)*rect.width; const pivotY = rect.top + (parseFloat(arrow.style.top)/100)*rect.height;
+        function moveHandle(ev){
+            const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            let angleDeg = Math.round(Math.atan2(cY - pivotY, cX - pivotX)*(180/Math.PI)); if(angleDeg < 0) angleDeg += 360;
+            const scale = parseInt(sizeSlider.value, 10) / 100;
+            let lengthPx = Math.sqrt(Math.pow(cX - pivotX, 2) + Math.pow(cY - pivotY, 2)) / scale;
+            if(lengthPx < 25) lengthPx = 25; if(lengthPx > 200) lengthPx = 200;
+            arrow.setAttribute('data-angle', angleDeg); arrow.style.transform = 'rotate('+angleDeg+'deg)'; arrow.style.width = lengthPx + 'px';
+        }
+        function endHandle(){
+            document.removeEventListener('touchmove', moveHandle); document.removeEventListener('touchend', endHandle);
+            document.removeEventListener('mousemove', moveHandle); document.removeEventListener('mouseup', endHandle);
+        }
+        document.addEventListener('touchmove', moveHandle, {passive: false}); document.addEventListener('touchend', endHandle);
+        document.addEventListener('mousemove', moveHandle); document.addEventListener('mouseup', endHandle);
+    }
+    handle.addEventListener('touchstart', startHandleDrag); handle.addEventListener('mousedown', startHandleDrag);
+}
+
+/* ---------------------------------------------------
+   AUSWAHL / LÖSCHEN
+--------------------------------------------------- */
+deleteBtn.addEventListener('click', () => {
+    if(activeArrow){ pushDeleteHistory(activeArrow); activeArrow.remove(); activeArrow = null; }
+    else if(activePlayer){ pushDeleteHistory(activePlayer); activePlayer.remove(); activePlayer = null; }
+    updateButtonVisibility();
+});
+function selectPlayer(p){
+    if(activePlayer) activePlayer.classList.remove('active');
+    if(activeArrow) activeArrow.classList.remove('active');
+    activeArrow = null; activePlayer = p;
+    if(p) p.classList.add('active'); updateButtonVisibility();
+}
+function selectArrow(a){
+    if(activePlayer) activePlayer.classList.remove('active');
+    if(activeArrow) activeArrow.classList.remove('active');
+    activePlayer = null; activeArrow = a;
+    if(a) a.classList.add('active'); updateButtonVisibility();
+}
+function updateButtonVisibility(){
+    const realP = activePlayer && activePlayer.isSelectable;
+    clearDrawingsBtn.style.display = isDrawingMode ? 'inline-flex' : 'none';
+    if(isDrawingMode){ addArrowBtn.style.display = 'none'; deleteBtn.style.display = 'none'; }
+    else { addArrowBtn.style.display = realP ? 'inline-flex' : 'none'; deleteBtn.style.display = (activePlayer || activeArrow) ? 'inline-flex' : 'none'; }
+}
+field.addEventListener('touchstart', (e) => { if(!isDrawingMode && (e.target===field || e.target.classList.contains('field-svg-overlay'))) selectPlayer(null); });
+field.addEventListener('mousedown', (e) => { if(!isDrawingMode && (e.target===field || e.target.classList.contains('field-svg-overlay'))) selectPlayer(null); });
+
+/* ---------------------------------------------------
+   SPIELFELD SVG
+--------------------------------------------------- */
+function renderFieldSVG(sport){
+    const existing = field.querySelector('.field-svg-overlay'); if(existing) existing.remove();
+    let svg = '';
+    if(sport === 'football'){
+        field.style.background = '#4caf50';
+        svg = `<svg preserveAspectRatio="none" width="100%" height="100%" viewBox="0 0 100 60"><rect x="1.5" y="1.5" width="97" height="57" fill="none" stroke="#fff" stroke-width="0.8"/><line x1="50" y1="0" x2="50" y2="60" stroke="#fff" stroke-width="0.8"/><circle cx="50" cy="30" r="8" fill="none" stroke="#fff" stroke-width="0.8"/><rect x="0" y="12" width="16" height="36" fill="none" stroke="#fff" stroke-width="0.8"/><rect x="0" y="22" width="6" height="16" fill="none" stroke="#fff" stroke-width="0.8"/><path d="M 16 23 A 8 8 0 0 1 16 37" fill="none" stroke="#fff" stroke-width="0.8"/><rect x="84" y="12" width="16" height="36" fill="none" stroke="#fff" stroke-width="0.8"/><rect x="94" y="22" width="6" height="16" fill="none" stroke="#fff" stroke-width="0.8"/><path d="M 84 23 A 8 8 0 0 0 84 37" fill="none" stroke="#fff" stroke-width="0.8"/></svg>`;
+    }
+    if(sport === 'basketball'){
+        field.style.background = '#d98b3a';
+        svg = `<svg preserveAspectRatio="none" width="100%" height="100%" viewBox="0 0 100 60"><rect x="1.5" y="1.5" width="97" height="57" fill="none" stroke="#fff" stroke-width="0.8"/><line x1="50" y1="0" x2="50" y2="60" stroke="#fff" stroke-width="0.8"/><circle cx="50" cy="30" r="6" fill="none" stroke="#fff" stroke-width="0.8"/><rect x="0" y="18" width="18" height="24" fill="#bd752b" stroke="#fff" stroke-width="0.8"/><path d="M 18 18 A 12 12 0 0 1 18 42" fill="none" stroke="#fff" stroke-width="0.8" stroke-dasharray="2,2"/><path d="M 0 5 A 25 25 0 0 1 28 30 A 25 25 0 0 1 0 55" fill="none" stroke="#fff" stroke-width="0.8"/><line x1="6" y1="27" x2="6" y2="33" stroke="#fff" stroke-width="0.8"/><circle cx="6" cy="30" r="1.5" fill="none" stroke="#fff" stroke-width="0.8"/><rect x="82" y="18" width="18" height="24" fill="#bd752b" stroke="#fff" stroke-width="0.8"/><path d="M 82 18 A 12 12 0 0 0 82 42" fill="none" stroke="#fff" stroke-width="0.8" stroke-dasharray="2,2"/><path d="M 100 5 A 25 25 0 0 0 72 30 A 25 25 0 0 0 100 55" fill="none" stroke="#fff" stroke-width="0.8"/><line x1="94" y1="27" x2="94" y2="33" stroke="#fff" stroke-width="0.8"/><circle cx="94" cy="30" r="1.5" fill="none" stroke="#fff" stroke-width="0.8"/></svg>`;
+    }
+    if(sport === 'handball'){
+        field.style.background = '#e0a86c';
+        svg = `<svg preserveAspectRatio="none" width="100%" height="100%" viewBox="0 0 100 60"><rect x="1.5" y="1.5" width="97" height="57" fill="#6baed6" stroke="#fff" stroke-width="0.8"/><line x1="50" y1="0" x2="50" y2="60" stroke="#fff" stroke-width="0.8"/><circle cx="50" cy="30" r="3" fill="none" stroke="#fff" stroke-width="0.8"/><path d="M 0 10 A 20 20 0 0 1 15 30 A 20 20 0 0 1 0 50 Z" fill="#e0a86c" stroke="#fff" stroke-width="0.8"/><path d="M 100 10 A 20 20 0 0 0 85 30 A 20 20 0 0 0 100 50 Z" fill="#e0a86c" stroke="#fff" stroke-width="0.8"/><path d="M 0 2 A 28 28 0 0 1 23 30 A 28 28 0 0 1 0 58" fill="none" stroke="#fff" stroke-width="0.8" stroke-dasharray="3,3"/><path d="M 100 2 A 28 28 0 0 0 77 30 A 28 28 0 0 0 100 58" fill="none" stroke="#fff" stroke-width="0.8" stroke-dasharray="3,3"/></svg>`;
+    }
+    if(sport === 'volleyball'){
+        field.style.background = '#ff9f1c';
+        svg = `<svg preserveAspectRatio="none" width="100%" height="100%" viewBox="0 0 100 60"><rect x="10" y="5" width="80" height="50" fill="#6fb3ff" stroke="#fff" stroke-width="1.2"/><line x1="50" y1="5" x2="50" y2="55" stroke="#fff" stroke-width="1.5"/><line x1="36" y1="5" x2="36" y2="55" stroke="#fff" stroke-width="0.8"/><line x1="64" y1="5" x2="64" y2="55" stroke="#fff" stroke-width="0.8"/></svg>`;
+    }
+    if(sport === 'icehockey'){
+        field.style.background = '#e6f7ff';
+        svg = `<svg preserveAspectRatio="none" width="100%" height="100%" viewBox="0 0 100 60"><rect x="2" y="2" width="96" height="56" rx="12" fill="none" stroke="#000" stroke-width="0.8"/><line x1="50" y1="2" x2="50" y2="58" stroke="#d90429" stroke-width="1.5"/><circle cx="50" cy="30" r="7" fill="none" stroke="#000" stroke-width="0.8"/><circle cx="50" cy="30" r="0.8" fill="#000"/><line x1="35" y1="2" x2="35" y2="58" stroke="#0077cc" stroke-width="1.2"/><line x1="65" y1="2" x2="65" y2="58" stroke="#0077cc" stroke-width="1.2"/><line x1="8" y1="5" x2="8" y2="55" stroke="#d90429" stroke-width="0.5"/><path d="M 8 26 A 4 4 0 0 1 8 34" fill="#6fb3ff" stroke="#d90429" stroke-width="0.5"/><line x1="92" y1="5" x2="92" y2="55" stroke="#d90429" stroke-width="0.5"/><path d="M 92 26 A 4 4 0 0 0 92 34" fill="#6fb3ff" stroke="#d90429" stroke-width="0.5"/><circle cx="18" cy="15" r="5" fill="none" stroke="#d90429" stroke-width="0.5"/><circle cx="18" cy="15" r="0.5" fill="#d90429"/><circle cx="18" cy="45" r="5" fill="none" stroke="#d90429" stroke-width="0.5"/><circle cx="18" cy="45" r="0.5" fill="#d90429"/><circle cx="82" cy="15" r="5" fill="none" stroke="#d90429" stroke-width="0.5"/><circle cx="82" cy="15" r="0.5" fill="#d90429"/><circle cx="82" cy="45" r="5" fill="none" stroke="#d90429" stroke-width="0.5"/><circle cx="82" cy="45" r="0.5" fill="#d90429"/></svg>`;
+    }
+    const overlay = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    overlay.classList.add('field-svg-overlay'); overlay.innerHTML = svg; field.appendChild(overlay);
+}
+
+function updateContextButtons() {
+    ballBtn.innerHTML = (ballIcons[currentSport] || '') + ' Ball';
+    const t = translations[LANG];
+    itemBtn.innerHTML = t.itemNames[currentSport] || t.itemNames.default;
+    coneBtn.style.color = getConeColor(currentSport);
+}
+
+/* ---------------------------------------------------
+   SPRACHE / ÜBERSETZUNG
+--------------------------------------------------- */
+const translations = {
+    de: {
+        sportNames: { football:'Fußball', basketball:'Basketball', handball:'Handball', volleyball:'Volleyball', icehockey:'Eishockey' },
+        namePlaceholder: 'Nr/Name',
+        coneBtn: '▲ Hütchen',
+        drawBtn: '✏️ Malen',
+        doneBtn: '✅ Fertig',
+        eraserBtn: '🧽 Radierer',
+        undoBtn: '↩️ Rückgängig',
+        clearDrawingsBtn: '🧹 Zeichnung löschen',
+        lineSolid: '▬ Durchgehend',
+        lineDashed: '┄ Gestrichelt',
+        addArrowBtn: '➦ Pfeil',
+        deleteBtn: '🗑️ Objekt löschen',
+        clearAllBtn: '🔄 Alles löschen',
+        zoomLabel: 'Größe anpassen:',
+        tacticNamePlaceholder: 'Taktikname...',
+        tacticSelectDefault: '-- Laden --',
+        saveBtn: '💾 Speichern',
+        deleteTacticBtn: '🗑️ Löschen',
+        exportImgBtn: '🖼️ Als Bild speichern',
+        aboutFooterBtn: 'Über TacticBoard',
+        devCredits: 'Entwickelt von <strong>Simon Mählmann</strong>',
+        confirmTitle: 'Wirklich alles löschen?',
+        yes: 'Ja', no: 'Nein',
+        aboutTitle: 'Über TacticBoard',
+        aboutText: `<strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
+        Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Tore, Körbe und Netze lassen sich am Eck-Griff in der Größe ändern. <br><br>
+        <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
+        <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
+        Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
+        Entwickelt von <strong>Simon Mählmann</strong>.`,
+        closeBtn: 'Schließen',
+        itemNames: { basketball:'🧺 Korb', volleyball:'🏐 Netz', default:'🥅 Tor' },
+        msgEnterName: 'Bitte Taktikname eingeben!',
+        msgSaved: 'Taktik erfolgreich gespeichert!',
+        msgSaveFailed: 'Speichern fehlgeschlagen (Speicher voll?).',
+        msgDeleted: 'Taktik gelöscht.',
+        msgFieldLoaded: (name) => name + ' geladen',
+        msgExportUnavailable: 'Export nicht verfügbar (Internetverbindung erforderlich).',
+        msgExportError: 'Fehler beim Export.'
+    },
+    en: {
+        sportNames: { football:'Football', basketball:'Basketball', handball:'Handball', volleyball:'Volleyball', icehockey:'Ice Hockey' },
+        namePlaceholder: 'No./Name',
+        coneBtn: '▲ Cone',
+        drawBtn: '✏️ Draw',
+        doneBtn: '✅ Done',
+        eraserBtn: '🧽 Eraser',
+        undoBtn: '↩️ Undo',
+        clearDrawingsBtn: '🧹 Clear Drawing',
+        lineSolid: '▬ Solid',
+        lineDashed: '┄ Dashed',
+        addArrowBtn: '➦ Arrow',
+        deleteBtn: '🗑️ Delete Object',
+        clearAllBtn: '🔄 Clear All',
+        zoomLabel: 'Adjust size:',
+        tacticNamePlaceholder: 'Tactic name...',
+        tacticSelectDefault: '-- Load --',
+        saveBtn: '💾 Save',
+        deleteTacticBtn: '🗑️ Delete',
+        exportImgBtn: '🖼️ Save Image',
+        aboutFooterBtn: 'About TacticBoard',
+        devCredits: 'Developed by <strong>Simon Mählmann</strong>',
+        confirmTitle: 'Really delete everything?',
+        yes: 'Yes', no: 'No',
+        aboutTitle: 'About TacticBoard',
+        aboutText: `<strong>TacticBoard</strong> is a digital tactics board for coaches and players. <br><br>
+        Place players, opponents, balls, goals and cones on dynamic fields (football, basketball, handball, volleyball, ice hockey) and draw movement paths and arrows. <br><br>
+        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Goals, baskets and nets can be resized using the corner handle. <br><br>
+        <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes.<br><br>
+        <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. <br><br>
+        Your tactics can be saved or exported as an image. <br><br>
+        Developed by <strong>Simon Mählmann</strong>.`,
+        closeBtn: 'Close',
+        itemNames: { basketball:'🧺 Basket', volleyball:'🏐 Net', default:'🥅 Goal' },
+        msgEnterName: 'Please enter a tactic name!',
+        msgSaved: 'Tactic saved successfully!',
+        msgSaveFailed: 'Save failed (storage full?).',
+        msgDeleted: 'Tactic deleted.',
+        msgFieldLoaded: (name) => name + ' loaded',
+        msgExportUnavailable: 'Export unavailable (internet connection required).',
+        msgExportError: 'Error during export.'
+    }
+};
+
+function applyLanguage(lang){
+    LANG = lang;
+    const t = translations[lang];
+    document.querySelectorAll('.sport-btn-left').forEach(btn => { btn.textContent = t.sportNames[btn.dataset.sport]; });
+    nameInput.placeholder = t.namePlaceholder;
+    coneBtn.innerHTML = t.coneBtn;
+    drawToggleBtn.innerHTML = isDrawingMode ? t.doneBtn : t.drawBtn;
+    eraserBtn.innerHTML = t.eraserBtn;
+    undoDrawBtn.innerHTML = t.undoBtn;
+    clearDrawingsBtn.innerHTML = t.clearDrawingsBtn;
+    lineStyleBtn.innerHTML = currentLineStyle === 'dashed' ? t.lineDashed : t.lineSolid;
+    addArrowBtn.innerHTML = t.addArrowBtn;
+    deleteBtn.innerHTML = t.deleteBtn;
+    clearAllBtn.innerHTML = t.clearAllBtn;
+    zoomLabelEl.textContent = t.zoomLabel;
+    tacticNameInput.placeholder = t.tacticNamePlaceholder;
+    if(tacticSelect.options.length) tacticSelect.options[0].textContent = t.tacticSelectDefault;
+    saveBtn.innerHTML = t.saveBtn;
+    deleteTacticBtn.innerHTML = t.deleteTacticBtn;
+    exportImgBtn.innerHTML = t.exportImgBtn;
+    aboutFooterBtn.textContent = t.aboutFooterBtn;
+    devCreditsEl.innerHTML = t.devCredits;
+    const confirmTitleEl = document.querySelector('#custom-confirm .modal-title');
+    if(confirmTitleEl) confirmTitleEl.textContent = t.confirmTitle;
+    confirmYes.textContent = t.yes;
+    confirmNo.textContent = t.no;
+    const aboutTitleEl = document.querySelector('#about-modal .modal-title');
+    if(aboutTitleEl) aboutTitleEl.textContent = t.aboutTitle;
+    aboutTextEl.innerHTML = t.aboutText;
+    closeAboutBtn.textContent = t.closeBtn;
+    flagDe.style.opacity = lang === 'de' ? '1' : '0.5';
+    flagEn.style.opacity = lang === 'en' ? '1' : '0.5';
+    updateContextButtons();
+}
+flagDe.addEventListener('click', () => applyLanguage('de'));
+flagEn.addEventListener('click', () => applyLanguage('en'));
+
+/* ---------------------------------------------------
+   SPORT & UI (Dropdown Toggle)
+--------------------------------------------------- */
+appNameEl.addEventListener('click', () => { 
+    sportPickerMenu.style.display = sportPickerMenu.style.display === 'none' || sportPickerMenu.style.display === '' ? 'block' : 'none'; 
+});
+document.addEventListener('click', (e) => {
+    if(!appNameEl.contains(e.target) && !sportPickerMenu.contains(e.target)) {
+        sportPickerMenu.style.display = 'none';
+    }
+});
+
+document.querySelectorAll('.sport-btn-left').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentSport = btn.dataset.sport;
+        field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove());
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        clearHistory();
+        activePlayer = null; activeArrow = null; updateButtonVisibility();
+        renderFieldSVG(currentSport);
+        updateContextButtons();
+        sportPickerMenu.style.display = 'none';
+        showToast(translations[LANG].msgFieldLoaded(translations[LANG].sportNames[currentSport]));
+    });
+});
+clearAllBtn.addEventListener('click', () => customConfirm.style.display = 'flex');
+confirmYes.addEventListener('click', () => {
+    customConfirm.style.display = 'none';
+    field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove());
+    ctx.clearRect(0,0,canvas.width,canvas.height); clearHistory();
+    activePlayer = null; activeArrow = null; updateButtonVisibility();
+});
+confirmNo.addEventListener('click', () => customConfirm.style.display = 'none');
+aboutFooterBtn.addEventListener('click', () => aboutModal.style.display = 'flex');
+closeAboutBtn.addEventListener('click', () => aboutModal.style.display = 'none');
+sizeSlider.addEventListener('input', () => {
+    const val = parseInt(sizeSlider.value, 10) / 100;
+    zoomWrapper.style.transform = 'scale('+val+')';
+    zoomWrapper.style.marginBottom = ((val * 100 - 100) * 1.5) + 'px';
+});
+
+/* ---------------------------------------------------
+   SPEICHERN / LADEN / BILD EXPORT
+--------------------------------------------------- */
+function getTactics(){ try{ return JSON.parse(localStorage.getItem('tacticboard_tactics') || '[]'); }catch(e){ return []; } }
+function saveTactics(list){
+    try {
+        localStorage.setItem('tacticboard_tactics', JSON.stringify(list));
+        return true;
+    } catch(e) {
+        return false;
+    }
+}
+function refreshTacticSelect(){
+    const list = getTactics(); tacticSelect.innerHTML = '<option value="">'+translations[LANG].tacticSelectDefault+'</option>';
+    list.forEach(t => { const opt = document.createElement('option'); opt.value = t.id; opt.textContent = t.name; tacticSelect.appendChild(opt); });
+}
+saveBtn.addEventListener('click', () => {
+    const name = tacticNameInput.value.trim();
+    if(!name) { showToast(translations[LANG].msgEnterName); return; }
+    const players = [];
+    field.querySelectorAll('.player').forEach(p => players.push({ className: p.className, text: p.dataset.text || p.innerText, left: p.style.left, top: p.style.top, width: p.style.width, height: p.style.height, color: p.dataset.color || p.style.color }));
+    const arrows = [];
+    field.querySelectorAll('.arrow-container').forEach(a => arrows.push({ left: a.style.left, top: a.style.top, width: a.style.width, angle: a.getAttribute('data-angle') || '0', color: a.dataset.color || '', dashed: a.dataset.dashed || 'false' }));
+    
+    const list = getTactics(); const id = Date.now().toString();
+    list.push({ id, name, sport: currentSport, players, arrows, drawing: drawingStrokes });
+    if(!saveTactics(list)){ showToast(translations[LANG].msgSaveFailed); return; }
+    refreshTacticSelect(); tacticSelect.value = id; tacticNameInput.value = '';
+    showToast(translations[LANG].msgSaved);
+});
+tacticSelect.addEventListener('change', () => {
+    const t = getTactics().find(x => x.id === tacticSelect.value); if(!t) return;
+    currentSport = t.sport || 'football'; renderFieldSVG(currentSport); updateContextButtons();
+    field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove()); ctx.clearRect(0,0,canvas.width,canvas.height);
+    clearHistory();
+    t.players.forEach(p => {
+        const isMovableObj = !p.className.includes('ball') && !p.className.includes('cone');
+        const el = createObject(p.className, p.text, p.left, p.top, sizePercentFor(p.className), isMovableObj, p.width, p.height, p.color);
+        if(p.className.includes('player') && isMovableObj) setupDoubleClickToggle(el);
+    });
+    t.arrows.forEach(a => { const arrow = buildArrowOnField(a.left, a.top, a.width, a.angle, a.color, a.dashed === 'true'); arrow.setAttribute('data-angle', a.angle); arrow.style.transform = 'rotate('+a.angle+'deg)'; });
+    
+    if (typeof t.drawing === 'string' && t.drawing.startsWith('data:image')) {
+        const img = new Image();
+        img.onload = () => { legacyBackgroundImage = img; redrawCanvas(); };
+        img.src = t.drawing;
+        drawingStrokes = [];
+    } else {
+        legacyBackgroundImage = null;
+        drawingStrokes = t.drawing || [];
+        redrawCanvas();
+    }
+});
+deleteTacticBtn.addEventListener('click', () => {
+    if(!tacticSelect.value) return;
+    const ok = saveTactics(getTactics().filter(x => x.id !== tacticSelect.value));
+    if(!ok){ showToast(translations[LANG].msgSaveFailed); return; }
+    refreshTacticSelect(); tacticSelect.value = '';
+    showToast(translations[LANG].msgDeleted);
+});
+
+exportImgBtn.addEventListener('click', () => {
+    selectPlayer(null); // Auswahl-Rahmen entfernen
+    
+    setTimeout(() => {
+        if(typeof html2canvas === 'undefined') {
+            showToast(translations[LANG].msgExportUnavailable);
+            return;
+        }
+        
+        html2canvas(field, { 
+            scale: 2, 
+            backgroundColor: getComputedStyle(field).backgroundColor,
+            logging: false
+        }).then(canvas => {
+            const link = document.createElement('a'); 
+            link.download = 'Taktik_' + (tacticNameInput.value || 'Board') + '.png'; 
+            link.href = canvas.toDataURL('image/png'); 
+            link.click();
+        }).catch(err => {
+            console.error("Export Fehler: ", err);
+            showToast(translations[LANG].msgExportError);
+        });
+    }, 150);
+});
+
+/* ---------------------------------------------------
+   INIT
+--------------------------------------------------- */
+renderFieldSVG('football');
+applyLanguage('de');
+refreshTacticSelect();
+updateButtonVisibility();
+updateToolSliders();
+updateUndoState();
+</script>
+</body>
+</html>

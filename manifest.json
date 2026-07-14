@@ -1,0 +1,13 @@
+{
+  "name": "TacticBoard",
+  "short_name": "TacticBoard",
+  "start_url": "index.html",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "image.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
