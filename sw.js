@@ -39,9 +39,3 @@ self.addEventListener('fetch', event => {
     })
   );
 });
-caches.match('./index.html');
-        }
-      });
-    })
-  );
-});
