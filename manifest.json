@@ -1,8 +1,8 @@
 {
-  "id": "de.taktiktafel.app",
-  "name": "Kinderfußball Taktiktafel",
-  "short_name": "Taktiktafel",
-  "description": "Offline-Taktiktafel für das Kinderfußball-Training",
+  "id": "de.tacticboard.app",
+  "name": "TacticBoard",
+  "short_name": "TacticBoard",
+  "description": "TacticBoard for different sports",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#222222",
