@@ -24,33 +24,42 @@ jobs:
 
     - name: Create Cordova Project
       run: |
-        # 1. Neues Cordova-Projekt erstellen
-        cordova create taktik_build de.taktiktafel.app Taktiktafel
-        
-        # 2. Die Konfiguration und dein Icon in den Build-Ordner schieben
-        cp config.xml taktik_build/config.xml
-        cp icon.png taktik_build/icon.png || true
-        
+        # 1. Neues Cordova-Projekt mit TacticBoard-Parametern erstellen
+        cordova create taktik_build de.tacticboard.app TacticBoard
         cd taktik_build
         
-        # 3. Android-Plattform frisch hinzufügen
+        # 2. Android-Plattform hinzufügen
         cordova platform add android
         
-        # 4. Deine App-Dateien hineinkopieren
+        # 3. Standard-HTML-Dateien leeren und deine App-Dateien hineinkopieren
         rm -rf www/*
         cp -r ../* www/ || true
         
-        # 5. Aufräumen
+        # WICHTIG: Kopiere deine korrigierte config.xml direkt ins Build-Projekt
+        cp ../config.xml config.xml || true
+        
+        # 4. Radikaler Icon-Fix: Wir überschreiben alle Android-System-Icons mit deinem image.png
+        cp ../image.png platforms/android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+        
+        # Für neuere Android-Versionen (Adaptive Icons) überschreiben wir auch das Vordergrund-Logo
+        cp ../image.png platforms/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png || true
+        cp ../image.png platforms/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png || true
+        
+        # 5. Aufräumen, damit sich der Roboter nicht selbst im Kreis kopiert
         rm -rf www/taktik_build www/.github
         
-        # 6. Holzhammer-Methode: Cache leeren und Ressourcen komplett neu erzwingen
-        cordova clean android --no-telemetry
-        
-        # 7. Die App fehlerfrei für Android zusammenbauen
+        # 6. Die App fehlerfrei für Android zusammenbauen
         cordova build android --device --no-telemetry
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Taktiktafel-APK
+        name: TacticBoard-APK
         path: taktik_build/platforms/android/app/build/outputs/apk/debug/app-debug.apk
