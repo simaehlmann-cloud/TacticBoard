@@ -86,29 +86,13 @@ jobs:
         cd taktik_build
         cordova platform add android@latest
 
-    - name: Copy App Icons (adaptiv)
+    - name: Copy App Icons
       run: |
         cd taktik_build
-        # Klassische Icons fuer aeltere Android-Versionen
         for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
           cp image.png platforms/android/app/src/main/res/mipmap-$d/ic_launcher.png || true
-          cp image.png platforms/android/app/src/main/res/mipmap-$d/ic_launcher_round.png || true
-          cp icon_fg.png platforms/android/app/src/main/res/mipmap-$d/ic_launcher_foreground.png || true
+          cp image.png platforms/android/app/src/main/res/mipmap-$d/ic_launcher_foreground.png || true
         done
-        # Hintergrundfarbe des adaptiven Icons
-        mkdir -p platforms/android/app/src/main/res/values
-        cp colors.xml platforms/android/app/src/main/res/values/tb_colors.xml
-        # Adaptives Icon fuer Android 8+ (Vordergrund-Ebene + Farbflaeche)
-        mkdir -p platforms/android/app/src/main/res/mipmap-anydpi-v26
-        cat > platforms/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'XML'
-        <?xml version="1.0" encoding="utf-8"?>
-        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-            <background android:drawable="@color/tb_icon_background"/>
-            <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-        </adaptive-icon>
-        XML
-        sed -i 's/^        //' platforms/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-        cp platforms/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml platforms/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
     # ---------- DEBUG-BUILD (laeuft, solange keine Secrets angelegt sind) ----------
 
@@ -117,7 +101,14 @@ jobs:
       run: |
         echo "Keine Keystore-Secrets gefunden - baue normale Debug-APK zum Testen."
         cd taktik_build
-        cordova build android --device --no-telemetry
+        cordova build android --device --no-telemetry 2>&1 | tee build_log.txt
+        if ! grep -q "BUILD SUCCESSFUL" build_log.txt; then
+          echo ""
+          echo "================= FEHLER-DIAGNOSE ================="
+          grep -n -i -B 2 -A 6 "error\|FAILURE\|Exception" build_log.txt | head -n 80 || true
+          echo "==================================================="
+          exit 1
+        fi
 
     - name: Upload Debug APK
       if: env.HAS_KEYSTORE != 'true'
@@ -184,4 +175,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: TacticBoard-Release-APK
-        path: taktik_build/platforms/android/app/build/outputs/apk/release/app-release.apk
+        path: taktik_build/platforms/android/app/build/outputs/apk/debug/../release/app-release.apk
