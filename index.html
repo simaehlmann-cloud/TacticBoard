@@ -73,7 +73,12 @@ html, body {
 
 /* FIELD WRAPPER */
 #zoom-wrapper {
-    width:100%; display:flex; justify-content:center; align-items:center; transform-origin:center top; margin-top:16px; margin-bottom:16px; transition: transform 0.1s ease-out;
+    width:100%; display:flex; justify-content:center; align-items:flex-start; transform-origin:center top;
+    margin:16px auto; transition: transform 0.1s ease-out;
+    /* Das Feld ist 3:2 breit. Damit es im Querformat nicht hoeher wird als
+       der Bildschirm, wird die Breite zusaetzlich an die Fensterhoehe
+       gekoppelt. Im Hochformat greift die Regel nicht. */
+    max-width: min(100%, calc((100vh - 300px) * 1.5));
 }
 
 /* FIELD */
@@ -292,7 +297,7 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
 
         <div class="zoom-row">
             <span id="zoomLabel">Größe anpassen:</span>
-            <input id="size-slider" type="range" min="60" max="150" value="100" />
+            <input id="size-slider" type="range" min="50" max="100" value="100" />
         </div>
 
         <div class="row">
@@ -408,6 +413,10 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
 </div>
 
 <div id="toast">Nachricht</div>
+
+<!-- Wird nur im Android-Build von Cordova bereitgestellt. In der Web-Version
+     ist die Datei nicht vorhanden; das ist ohne Folgen. -->
+<script src="cordova.js"></script>
 
 <script>
 const field = document.getElementById('football-field');
@@ -1778,14 +1787,19 @@ const translations = {
         importSquadBtn: '📋 Kader einfügen',
         confirmDeleteTactic: 'Diese Taktik wirklich löschen?',
         msgUpdated: 'Taktik aktualisiert.',
+        msgBackAgainToExit: 'Zum Beenden erneut auf Zurück tippen.',
+        titlePlayer: 'Spieler',
+        titleEnemy: 'Gegner',
+        titlePenWidth: 'Stiftbreite',
+        titleEraserSize: 'Radiergröße',
         importTitle: 'Kader einfügen',
-        importHint: 'Teile den Spieltag im Kaderplaner und füge den Text hier ein. Die Spieler werden als Startaufstellung aufs Feld gesetzt, überzählige an die Seitenlinie.',
-        importPasteBtn: '📋 Einfügen',
-        importParseBtn: '🔍 Prüfen',
+        importHint: 'Teile den Spieltag im Kaderplaner und füge den Text unten ein – der Kader wird sofort erkannt. Die Spieler kommen als Startaufstellung aufs Feld, überzählige an die Seitenlinie.',
+        importPasteBtn: '📋 Aus Zwischenablage',
+        importParseBtn: '🔍 Erneut prüfen',
         importApplyBtn: '✅ Aufs Feld',
         importPlayers: 'Spieler',
         msgImportNoSquad: 'Kein Kader erkannt. Steht der komplette Teilen-Text im Feld?',
-        msgPasteManually: 'Bitte von Hand einfügen (lange auf das Feld tippen).',
+        msgPasteManually: 'Kein Zugriff auf die Zwischenablage. Lange auf das Textfeld tippen und „Einfügen" wählen – der Kader wird dann automatisch erkannt.',
         msgSquadPlaced: (n) => n + ' Spieler aufs Feld gesetzt.',
         msgSelectTactic: 'Bitte zuerst eine Taktik im Auswahlfeld wählen.',
         msgSaveFailed: 'Speichern fehlgeschlagen (Speicher voll?).',
@@ -1875,14 +1889,19 @@ const translations = {
         importSquadBtn: '📋 Import squad',
         confirmDeleteTactic: 'Really delete this tactic?',
         msgUpdated: 'Tactic updated.',
+        msgBackAgainToExit: 'Press back again to exit.',
+        titlePlayer: 'Player',
+        titleEnemy: 'Opponent',
+        titlePenWidth: 'Pen width',
+        titleEraserSize: 'Eraser size',
         importTitle: 'Import squad',
-        importHint: 'Share a matchday in the squad planner and paste the text here. Players are placed as a starting line-up, extras go to the sideline.',
-        importPasteBtn: '📋 Paste',
-        importParseBtn: '🔍 Check',
+        importHint: 'Share a matchday in the squad planner and paste the text below – the squad is detected right away. Players are placed as a starting line-up, extras go to the sideline.',
+        importPasteBtn: '📋 From clipboard',
+        importParseBtn: '🔍 Check again',
         importApplyBtn: '✅ Place on pitch',
         importPlayers: 'players',
         msgImportNoSquad: 'No squad found. Is the complete shared text in the field?',
-        msgPasteManually: 'Please paste manually (long-press the field).',
+        msgPasteManually: 'No clipboard access. Long-press the text box and choose “Paste” – the squad is then detected automatically.',
         msgSquadPlaced: (n) => n + ' players placed on the pitch.',
         msgSelectTactic: 'Please select a tactic from the list first.',
         msgSaveFailed: 'Save failed (storage full?).',
@@ -1935,6 +1954,10 @@ function applyLanguage(lang){
     const t = translations[lang];
     document.querySelectorAll('.sport-btn-left').forEach(btn => { btn.textContent = t.sportNames[btn.dataset.sport]; });
     nameInput.placeholder = t.namePlaceholder;
+    actionBtn.title = t.titlePlayer;
+    enemyBtn.title = t.titleEnemy;
+    penSizeSlider.title = t.titlePenWidth;
+    eraserSizeSlider.title = t.titleEraserSize;
     drawToggleBtn.innerHTML = isDrawingMode ? t.doneBtn : t.drawBtn;
     eraserBtn.innerHTML = t.eraserBtn;
     undoDrawBtn.innerHTML = t.undoBtn;
@@ -2055,11 +2078,22 @@ confirmYes.addEventListener('click', () => {
 confirmNo.addEventListener('click', () => { confirmAction = null; customConfirm.style.display = 'none'; });
 aboutFooterBtn.addEventListener('click', () => aboutModal.style.display = 'flex');
 closeAboutBtn.addEventListener('click', () => aboutModal.style.display = 'none');
-sizeSlider.addEventListener('input', () => {
-    const val = parseInt(sizeSlider.value, 10) / 100;
-    zoomWrapper.style.transform = 'scale('+val+')';
-    zoomWrapper.style.marginBottom = ((val * 100 - 100) * 1.5) + 'px';
-});
+/* Der Regler verkleinert das Feld nur noch (50-100 %). Werte ueber 100 %
+   haben das Feld ueber den Bildschirmrand geschoben - Spieler am Rand waren
+   dann nicht mehr erreichbar. Die Einstellung wird gemerkt, damit sie nach
+   einem versehentlichen Wischen nicht ueberrascht. */
+const ZOOM_KEY = 'tacticboard_zoom';
+function applyZoom(percent, save){
+    const val = Math.max(50, Math.min(100, parseInt(percent, 10) || 100)) / 100;
+    zoomWrapper.style.transform = val === 1 ? '' : 'scale(' + val + ')';
+    zoomWrapper.style.marginBottom = val === 1 ? '' : ((val - 1) * zoomWrapper.offsetHeight) + 'px';
+    if(save){ try{ localStorage.setItem(ZOOM_KEY, String(Math.round(val * 100))); }catch(e){} }
+}
+sizeSlider.addEventListener('input', () => applyZoom(sizeSlider.value, true));
+try {
+    const stored = localStorage.getItem(ZOOM_KEY);
+    if(stored){ sizeSlider.value = stored; applyZoom(stored, false); }
+} catch(e){}
 
 /* ---------------------------------------------------
    SPEICHERN / LADEN / BILD EXPORT
@@ -2141,6 +2175,58 @@ deleteTacticBtn.addEventListener('click', () => {
     });
 });
 
+
+/* ---------------------------------------------------
+   ANDROID: ZURUECK-TASTE
+
+   Zurueck arbeitet sich schrittweise nach aussen, statt die App sofort zu
+   beenden: erst offene Dialoge, dann das Sportart-Menue, dann eine
+   Auswahl bzw. der Zeichenmodus. Erst wenn nichts mehr offen ist, beendet
+   ein zweiter Druck innerhalb von zwei Sekunden die App - so kann man sie
+   verlassen, aber nicht aus Versehen.
+--------------------------------------------------- */
+let backExitArmed = 0;
+
+function closeTopmostLayer(){
+    // 1. offene Dialoge
+    const modals = [...document.querySelectorAll('.modal-overlay')]
+        .filter(m => m.style.display && m.style.display !== 'none');
+    if(modals.length){ modals.forEach(m => m.style.display = 'none'); confirmAction = null; return true; }
+
+    // 2. Sportart-Menue
+    if(sportPickerMenu && sportPickerMenu.style.display === 'block'){
+        sportPickerMenu.style.display = 'none'; return true;
+    }
+
+    // 3. laufende Animation stoppen
+    if(isAnimating){ stopRequested = true; return true; }
+
+    // 4. Zeichenmodus verlassen
+    if(isDrawingMode){ drawToggleBtn.click(); return true; }
+
+    // 5. Auswahl aufheben
+    if(activePlayer || activeArrow){ selectPlayer(null); selectArrow(null); return true; }
+
+    return false;
+}
+
+function handleBackButton(e){
+    if(e && e.preventDefault) e.preventDefault();
+    if(closeTopmostLayer()){ backExitArmed = 0; return; }
+
+    const now = Date.now();
+    if(now - backExitArmed < 2000){
+        if(navigator.app && navigator.app.exitApp) navigator.app.exitApp();
+        else if(navigator.device && navigator.device.exitApp) navigator.device.exitApp();
+        return;
+    }
+    backExitArmed = now;
+    showToast(translations[LANG].msgBackAgainToExit);
+}
+
+document.addEventListener('deviceready', () => {
+    document.addEventListener('backbutton', handleBackButton, false);
+}, false);
 
 /* ---------------------------------------------------
    KADER-IMPORT (Teilen-Text des U11-Kaderplaners)
@@ -2261,6 +2347,15 @@ function renderImportPreview(){
     importApplyBtn.disabled = importSel < 0;
 }
 
+/* Beim automatischen Pruefen keine Meldung zeigen: waehrend des Einfuegens
+   ist der Text zwischendurch zwangslaeufig unvollstaendig. */
+function runImportParseQuiet(){
+    importBlocks = parseSquadText(importTextArea.value);
+    importSel = importBlocks.length ? 0 : -1;
+    if(!importBlocks.length){ importPreview.innerHTML = ''; importApplyBtn.disabled = true; return; }
+    renderImportPreview();
+}
+
 function runImportParse(){
     importBlocks = parseSquadText(importTextArea.value);
     importSel = importBlocks.length ? 0 : -1;
@@ -2325,14 +2420,29 @@ importSquadBtn.addEventListener('click', () => {
 });
 importCloseBtn.addEventListener('click', () => importSquadModal.style.display = 'none');
 importParseBtn.addEventListener('click', runImportParse);
+/* Sobald Text im Feld steht, wird sofort geprueft - der Umweg ueber einen
+   extra Knopf war nicht nachvollziehbar. Kurze Verzoegerung, damit das
+   Einfuegen erst abgeschlossen ist. */
+let importParseTimer = null;
+function scheduleImportParse(){
+    clearTimeout(importParseTimer);
+    importParseTimer = setTimeout(() => { if(importTextArea.value.trim()) runImportParseQuiet(); }, 150);
+}
+importTextArea.addEventListener('input', scheduleImportParse);
+importTextArea.addEventListener('paste', scheduleImportParse);
 importApplyBtn.addEventListener('click', () => {
     if(importSel >= 0 && importBlocks[importSel]) applySquadToField(importBlocks[importSel]);
 });
+/* Direktes Lesen der Zwischenablage klappt nur, wenn das System es erlaubt.
+   Scheitert es, ist das kein Fehler - der Text kann von Hand eingefuegt
+   werden und wird dann automatisch erkannt. */
 importPasteBtn.addEventListener('click', async () => {
     try {
-        const txt = await navigator.clipboard.readText();
-        if(txt){ importTextArea.value = txt; runImportParse(); return; }
-    } catch(e){ /* Zwischenablage nicht erlaubt - dann von Hand einfuegen */ }
+        if(navigator.clipboard && navigator.clipboard.readText){
+            const txt = await navigator.clipboard.readText();
+            if(txt && txt.trim()){ importTextArea.value = txt; runImportParse(); return; }
+        }
+    } catch(e){ /* keine Freigabe - unten weiter */ }
     importTextArea.focus();
     showToast(translations[LANG].msgPasteManually);
 });
