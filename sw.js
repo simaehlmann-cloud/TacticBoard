@@ -1,50 +1,75 @@
-const CACHE_NAME = 'tacticboard-v3.0';
+/* TacticBoard Service Worker
+ *
+ * Strategie:
+ *   - App-Shell (index.html / Navigation): NETWORK FIRST.
+ *     So bekommt jeder Nutzer beim naechsten Start automatisch die aktuelle
+ *     Version. Der Cache dient nur noch als Offline-Fallback.
+ *   - Uebrige Assets (Icons, Bibliotheken, datenschutz.html): CACHE FIRST,
+ *     da sie sich praktisch nie aendern und offline sofort da sein muessen.
+ */
+const CACHE_NAME = 'tacticboard-v3.1';
+const SHELL = './index.html';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './image.png'
+  './image.png',
+  './datenschutz.html'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      // einzeln cachen: eine fehlende Datei darf die Installation nicht kippen
+      .then(cache => Promise.all(ASSETS.map(url => cache.add(url).catch(() => {}))))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null)))
+      .then(() => self.clients.claim())
   );
 });
 
+function putInCache(request, response) {
+  if (!response || !response.ok || response.type === 'opaque') return response;
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
+  return response;
+}
+
 self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  const isShell = req.mode === 'navigate' || new URL(req.url).pathname.endsWith('/index.html');
+
+  if (isShell) {
+    // NETWORK FIRST - immer die neueste index.html, Cache nur als Fallback
+    event.respondWith(
+      fetch(req)
+        .then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(SHELL, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match(SHELL).then(hit => hit || caches.match('./')))
+    );
+    return;
+  }
+
+  // CACHE FIRST fuer alles andere
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then(response => {
-        // Erfolgreiche Antworten (z.B. die Export-Bibliotheken) fuer
-        // die Offline-Nutzung mitcachen
-        if (response && response.ok && event.request.method === 'GET') {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
+    caches.match(req).then(hit => {
+      if (hit) return hit;
+      return fetch(req)
+        .then(res => putInCache(req, res))
+        .catch(() => undefined);
     })
   );
 });

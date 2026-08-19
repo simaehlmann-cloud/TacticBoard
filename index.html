@@ -2,6 +2,10 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
+<!-- Content-Security-Policy: die App laedt ausser der CDN-Rueckfallebene fuer
+     html2canvas/gif.js nichts von fremden Servern. Falls im Cordova-Build je
+     etwas nicht laedt, ist diese Zeile der erste Verdaechtige. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob: https://cdnjs.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <title>TacticBoard</title>
 
@@ -104,7 +108,14 @@ button:disabled { opacity:0.35; cursor:not-allowed; filter:none; }
 #color1-btn, #color2-btn { width:36px; height:36px; border-radius:6px; border:2px solid #fff; cursor:pointer; }
 #color1-btn {background:var(--draw-color-1);} #color2-btn {background:var(--draw-color-2);}
 #clear-drawings-btn {background:#d68c45;display:none;} #add-arrow-btn {background:#f4a261;display:none;} #delete-btn {background:#b70909;display:none;}
-#save-btn { background-color: #2a9d8f; } #delete-tactic-btn { background-color: #555; } #export-img-btn { background-color: #9c27b0; }
+#import-squad-btn { background-color: #6a4c93; }
+#import-text { width:100%; box-sizing:border-box; border-radius:8px; border:none; padding:10px; font-size:13px; font-family:monospace; resize:vertical; }
+#import-preview { text-align:left; margin:12px 0; display:flex; flex-direction:column; gap:8px; }
+.import-block { background:#16324f; border:2px solid transparent; border-radius:8px; padding:10px; cursor:pointer; font-size:13px; line-height:1.45; }
+.import-block.sel { border-color:#4caf50; background:#1b4066; }
+.import-block b { color:#8fd694; }
+.import-block .names { color:#cfd8e3; font-size:12px; margin-top:4px; }
+#save-btn { background-color: #2a9d8f; } #load-btn { background-color: #457b9d; } #delete-tactic-btn { background-color: #555; } #export-img-btn { background-color: #9c27b0; }
 
 .zoom-row { display:flex; align-items:center; gap:10px; background:#444; padding:10px; border-radius:8px; }
 .zoom-row input { flex:1; cursor: pointer; }
@@ -113,6 +124,7 @@ button:disabled { opacity:0.35; cursor:not-allowed; filter:none; }
 /* PLAYER OBJECTS */
 .player {
     position:absolute; width:9%; aspect-ratio:1/1; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 12px; color:#fff; border:2px solid #fff; background:#e63946; z-index:10; touch-action:none; box-sizing: border-box; box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+    white-space:nowrap; overflow:hidden; letter-spacing:-0.3px;
 }
 .player.enemy {background:#1d3557;}
 .player.active { border-color: #ffeb3b; box-shadow: 0 0 12px #ffeb3b; }
@@ -284,12 +296,17 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
         </div>
 
         <div class="row">
+            <button id="import-squad-btn">📋 Kader einfügen</button>
+        </div>
+
+        <div class="row">
             <input id="tactic-name-input" class="grow" type="text" placeholder="Taktikname..." />
             <select id="tactic-select" class="grow"></select>
         </div>
 
         <div class="row">
             <button id="save-btn">💾 Speichern</button>
+            <button id="load-btn">📂 Laden</button>
             <button id="delete-tactic-btn">🗑️ Löschen</button>
             <button id="export-img-btn">🖼️ Als Bild speichern</button>
             <button id="export-gif-btn" style="display:none;">🎞️ Als GIF speichern</button>
@@ -373,6 +390,23 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
   </div>
 </div>
 
+<div id="import-squad-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-title" id="import-title">Kader einfügen</div>
+    <div class="modal-text" id="import-hint">Teile den Spieltag im Kaderplaner und füge den Text hier ein.</div>
+    <textarea id="import-text" rows="6" placeholder="*SV Weyhe U11 II · Fr., 21.08.2026*&#10;..."></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="import-paste-btn" style="background:#457b9d;">📋 Einfügen</button>
+      <button id="import-parse-btn" style="background:#2a9d8f;">🔍 Prüfen</button>
+    </div>
+    <div id="import-preview"></div>
+    <div class="row">
+      <button id="import-apply-btn" style="background:#4caf50; flex:1; justify-content:center;" disabled>✅ Aufs Feld</button>
+      <button id="import-close-btn" style="background:#555;">Schließen</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast">Nachricht</div>
 
 <script>
@@ -407,6 +441,7 @@ const zoomWrapper = document.getElementById('zoom-wrapper');
 const tacticNameInput = document.getElementById('tactic-name-input');
 const tacticSelect = document.getElementById('tactic-select');
 const saveBtn = document.getElementById('save-btn');
+const loadBtn = document.getElementById('load-btn');
 const deleteTacticBtn = document.getElementById('delete-tactic-btn');
 const exportImgBtn = document.getElementById('export-img-btn');
 
@@ -485,30 +520,55 @@ function sizePercentFor(className){
 /* ---------------------------------------------------
    CANVAS RESIZE
 --------------------------------------------------- */
+/* Der Zeichen-Layer arbeitet intern in CSS-Pixeln, der Speicher dahinter
+   liegt aber in Geraetepixeln (devicePixelRatio). Sonst sind Linien auf
+   modernen Displays sichtbar weich. */
+let canvasDpr = 1;
+function canvasW(){ return canvas.width / canvasDpr; }
+function canvasH(){ return canvas.height / canvasDpr; }
+function clearCanvasAll(){
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
 function resizeCanvas(){
-    canvas.width = field.clientWidth;
-    canvas.height = field.clientHeight;
+    const w = field.clientWidth, h = field.clientHeight;
+    if(!w || !h) return;
+    canvasDpr = Math.min(window.devicePixelRatio || 1, 3);   // 3 reicht, mehr kostet nur Speicher
+    canvas.width  = Math.round(w * canvasDpr);
+    canvas.height = Math.round(h * canvasDpr);
     redrawCanvas();
     field.querySelectorAll('.arrow-container').forEach(a => applyArrowVisual(a));
 }
 window.addEventListener('load', resizeCanvas);
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
 
 /* ---------------------------------------------------
    DRAWING (VEKTOR) + UNDO HISTORY
 --------------------------------------------------- */
 const MAX_HISTORY = 30;
+const MIN_POINT_DIST = 0.004;   // ~1.5 px auf einem 360-px-Feld
+let redrawPending = false;
+/* Hoechstens ein Neuzeichnen pro Bildwiederholung statt eines pro
+   Touch-Event - beim Zeichnen langer Linien war das der Flaschenhals */
+function scheduleRedraw(){
+    if(redrawPending) return;
+    redrawPending = true;
+    requestAnimationFrame(() => { redrawPending = false; redrawCanvas(); });
+}
 let actionHistory = [];
 let drawingStrokes = [];
 let currentStroke = null;
 let legacyBackgroundImage = null;
 
 function redrawCanvas() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const CW = canvasW(), CH = canvasH();
+    ctx.setTransform(canvasDpr, 0, 0, canvasDpr, 0, 0);  // ab hier wieder in CSS-Pixeln rechnen
+    ctx.clearRect(0, 0, CW, CH);
     if(legacyBackgroundImage){
         ctx.globalCompositeOperation = 'source-over';
         ctx.setLineDash([]);
-        ctx.drawImage(legacyBackgroundImage, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(legacyBackgroundImage, 0, 0, CW, CH);
     }
     for(let stroke of drawingStrokes) {
         if(!stroke.points || stroke.points.length === 0) continue;
@@ -519,21 +579,21 @@ function redrawCanvas() {
         ctx.setLineDash(stroke.style === 'dashed' ? [12,8] : []);
 
         ctx.beginPath();
-        ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
+        ctx.moveTo(stroke.points[0].x * CW, stroke.points[0].y * CH);
 
         if(stroke.points.length < 3) {
             for(let i=1; i<stroke.points.length; i++) {
-                ctx.lineTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height);
+                ctx.lineTo(stroke.points[i].x * CW, stroke.points[i].y * CH);
             }
         } else {
             for (let i = 1; i < stroke.points.length - 1; i++) {
-                let xc = (stroke.points[i].x * canvas.width + stroke.points[i + 1].x * canvas.width) / 2;
-                let yc = (stroke.points[i].y * canvas.height + stroke.points[i + 1].y * canvas.height) / 2;
-                ctx.quadraticCurveTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height, xc, yc);
+                let xc = (stroke.points[i].x * CW + stroke.points[i + 1].x * CW) / 2;
+                let yc = (stroke.points[i].y * CH + stroke.points[i + 1].y * CH) / 2;
+                ctx.quadraticCurveTo(stroke.points[i].x * CW, stroke.points[i].y * CH, xc, yc);
             }
             let last = stroke.points[stroke.points.length-1];
             let secondLast = stroke.points[stroke.points.length-2];
-            ctx.quadraticCurveTo(secondLast.x * canvas.width, secondLast.y * canvas.height, last.x * canvas.width, last.y * canvas.height);
+            ctx.quadraticCurveTo(secondLast.x * CW, secondLast.y * CH, last.x * CW, last.y * CH);
         }
         ctx.stroke();
     }
@@ -624,16 +684,24 @@ function startDraw(e){
 
 // BUGFIX: Zeichnet die Linie als Ganzes neu, damit die Strichelung sofort korrekt dargestellt wird
 function moveDraw(e){
-    if(!isDrawingMode || !drawing) return;
+    if(!isDrawingMode || !drawing || !currentStroke) return;
     if(e.cancelable) e.preventDefault();
-    
+
     const pos = getEventPos(e);
+    const last = currentStroke.points[currentStroke.points.length - 1];
+    // Mikrobewegungen verwerfen: gleiche Optik, deutlich weniger Punkte -
+    // das entlastet jedes Neuzeichnen und den Speicherplatz beim Sichern
+    if(last && Math.hypot(pos.x - last.x, pos.y - last.y) < MIN_POINT_DIST) return;
     currentStroke.points.push(pos);
-    
-    redrawCanvas();
+
+    scheduleRedraw();
 }
 
-function endDraw(e){ if(isDrawingMode) drawing = false; }
+function endDraw(e){
+    if(!isDrawingMode) return;
+    drawing = false;
+    if(redrawPending) redrawCanvas();   // letzten Zwischenstand sicher zeichnen
+}
 canvas.addEventListener('touchstart', startDraw, {passive: false}); canvas.addEventListener('touchmove', moveDraw, {passive: false});
 canvas.addEventListener('touchend', endDraw); canvas.addEventListener('mousedown', startDraw);
 canvas.addEventListener('mousemove', moveDraw); canvas.addEventListener('mouseup', endDraw); canvas.addEventListener('mouseleave', endDraw);
@@ -699,10 +767,28 @@ clearDrawingsBtn.addEventListener('click', () => { pushCanvasHistory(); drawingS
 --------------------------------------------------- */
 function getConeColor(sport){ return sport === 'basketball' ? '#2196f3' : getComputedStyle(document.documentElement).getPropertyValue('--cone-color').trim(); }
 
+/* Anzeige-Label fuer Spielerkreise: erster Vorname, hoechstens 6 Zeichen */
+function playerLabel(raw){
+    const s = String(raw == null ? '' : raw).trim();
+    if(s.length <= 6) return s;
+    const first = s.split(/\s+/)[0];
+    return first.length <= 6 ? first : first.slice(0, 6);
+}
+/* Schrift passend zur Labellaenge - vw-basiert, damit sie auf jedem
+   Display und bei jeder Zoomstufe mitwaechst */
+function applyLabelSize(el){
+    const n = (el.innerText || '').length;
+    el.style.fontSize = n <= 2 ? ''
+        : n === 3 ? 'clamp(7px, 2.5vw, 14px)'
+        : n === 4 ? 'clamp(6px, 2.0vw, 12px)'
+        : n === 5 ? 'clamp(5.5px, 1.7vw, 10px)'
+        : 'clamp(5px, 1.45vw, 9px)';
+}
+
 function createObject(className, text, left, top, sizePercent, selectable, wPercent=null, hPercent=null, objColor=null, oid=null, variant=null, rotation=null){
     const el = document.createElement('div');
     el.className = className; el.style.left = left; el.style.top = top;
-    el.isSelectable = selectable; el.dataset.text = text;
+    el.dataset.selectable = selectable ? '1' : '0'; el.dataset.text = text;
     el.dataset.oid = oid || ('o' + (++oidCounter) + '_' + Date.now());
 
     if (wPercent) el.style.width = wPercent;
@@ -739,7 +825,15 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
         setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); field.appendChild(el); return el;
     }
 
-    el.innerText = text || ''; setupPercentDrag(el, sizePercent); field.appendChild(el); return el;
+    // Lange Namen wuerden aus dem Kreis herauslaufen: gekuerzt anzeigen,
+    // vollstaendigen Text in dataset.text behalten (Speichern/Laden bleibt exakt)
+    if(className.includes('ball')){
+        el.innerText = text || '';
+    } else {
+        el.innerText = playerLabel(text || '');
+        applyLabelSize(el);
+    }
+    setupPercentDrag(el, sizePercent); field.appendChild(el); return el;
 }
 
 function setupItemResize(el) {
@@ -955,10 +1049,18 @@ function setupPercentDrag(el, size) {
     el.addEventListener('touchstart', startDrag, { passive: false }); el.addEventListener('mousedown', startDrag);
 }
 
+/* Touch-Geraete feuern nach einem Tipp zusaetzlich ein Maus-Ereignis.
+   Auf Hybridgeraeten (Touch-Notebook, Chromebook) zaehlte der Doppeltipp
+   dadurch doppelt. Maus-Ereignisse kurz nach einer Beruehrung ignorieren. */
+let lastTouchAt = 0;
+document.addEventListener('touchstart', () => { lastTouchAt = Date.now(); }, true);
+function isTouchEcho(e){ return e.type.indexOf('mouse') === 0 && (Date.now() - lastTouchAt) < 700; }
+
 function setupDoubleClickToggle(el) {
     let lastTap = 0;
     function handleTap(e) {
-        if (isDrawingMode) return; const now = Date.now();
+        if (isDrawingMode || isTouchEcho(e)) return;
+        const now = Date.now();
         if (now - lastTap < 300 && now - lastTap > 0) { el.classList.toggle('enemy'); if (e.cancelable) e.preventDefault(); }
         lastTap = now;
     }
@@ -1204,7 +1306,7 @@ function selectArrow(a){
     if(a) a.classList.add('active'); updateButtonVisibility();
 }
 function updateButtonVisibility(){
-    const realP = activePlayer && activePlayer.isSelectable;
+    const realP = activePlayer && activePlayer.dataset.selectable === '1';
     clearDrawingsBtn.style.display = isDrawingMode ? 'inline-flex' : 'none';
     if(isDrawingMode){ addArrowBtn.style.display = 'none'; deleteBtn.style.display = 'none'; }
     else { addArrowBtn.style.display = realP ? 'inline-flex' : 'none'; deleteBtn.style.display = (activePlayer || activeArrow) ? 'inline-flex' : 'none'; }
@@ -1220,7 +1322,7 @@ function updateButtonVisibility(){
         // Schritt-Steuerung nur im Animations-Modus; die Punkt-Buttons sind auch für statische Aufstellungen nützlich
         paceBtn.innerHTML = translations[LANG].paceNames[activeArrow.dataset.pace || 'normal'];
         [stepLabelText, stepMinusBtn, stepDisplay, stepPlusBtn, paceBtn].forEach(el => { el.style.display = isAnimMode ? '' : 'none'; });
-        const tgt = activeArrow.dataset.targetOid ? field.querySelector('[data-oid="' + activeArrow.dataset.targetOid + '"]') : null;
+        const tgt = findByOid(activeArrow.dataset.targetOid);
         const isBallTarget = tgt && tgt.classList.contains('ball');
         const canDribble = tgt && !isBallTarget && !tgt.classList.contains('cone') && !tgt.classList.contains('item-obj');
         withBallBtn.style.display = (isAnimMode && canDribble) ? 'inline-flex' : 'none';
@@ -1298,6 +1400,16 @@ animToggleBtn.addEventListener('click', () => {
     updateButtonVisibility();
 });
 
+// Objekt-Lookup ueber die oid. Bewusst KEIN querySelector mit eingesetztem
+// Wert: oids koennen aus importierten JSON-Dateien stammen und wuerden dort
+// als CSS-Selektor interpretiert (Syntaxfehler / Selector-Injection).
+function findByOid(oid){
+    if(!oid) return null;
+    const all = field.querySelectorAll('.player');
+    for(const el of all){ if(el.dataset.oid === oid) return el; }
+    return null;
+}
+
 function centerOf(el){ return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 }; }
 function setCenter(el, x, y){
     const fw = field.clientWidth, fh = field.clientHeight;
@@ -1313,7 +1425,7 @@ function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 
 function animateArrow(arrow){
     return new Promise(resolve => {
-        const tgt = arrow.dataset.targetOid ? field.querySelector('[data-oid="' + arrow.dataset.targetOid + '"]') : null;
+        const tgt = findByOid(arrow.dataset.targetOid);
         const pts = getArrowPixelPoints(arrow);
         if(!tgt || pts.length < 2){ resolve(); return; }
         // Pfad starr an die aktuelle Objektposition verschieben (Form bleibt exakt erhalten)
@@ -1397,22 +1509,32 @@ async function playAnimation(noLoop){
     arrows.forEach(a => { const s = parseInt(a.dataset.step || '1', 10); (groups[s] = groups[s] || []).push(a); });
     const keys = Object.keys(groups).map(Number).sort((a, b) => a - b);
     const loop = isLooping && !noLoop;
-    do {
-        for(const k of keys){
-            if(stopRequested) break;
-            groups[k].forEach(a => a.classList.add('anim-current'));
-            await Promise.all(groups[k].map(animateArrow));
-            groups[k].forEach(a => a.classList.remove('anim-current'));
-            await new Promise(r => setTimeout(r, 250)); // kurze Pause zwischen den Schritten
-        }
-        if(loop && !stopRequested){
-            restoreBaseline(); // zurück auf Anfang und erneut abspielen
-            await new Promise(r => setTimeout(r, 700));
-        }
-    } while(loop && !stopRequested);
-    field.classList.remove('anim-playing');
-    isAnimating = false;
-    playBtn.innerHTML = translations[LANG].playBtn;
+    // try/finally: egal welcher Fehler in der Animation auftritt - die App darf
+    // niemals mit isAnimating=true haengenbleiben (Play-Button waere sonst tot)
+    try {
+        do {
+            for(const k of keys){
+                if(stopRequested) break;
+                groups[k].forEach(a => a.classList.add('anim-current'));
+                await Promise.all(groups[k].map(animateArrow));
+                groups[k].forEach(a => a.classList.remove('anim-current'));
+                await new Promise(r => setTimeout(r, 250)); // kurze Pause zwischen den Schritten
+            }
+            if(loop && !stopRequested){
+                restoreBaseline(); // zurück auf Anfang und erneut abspielen
+                await new Promise(r => setTimeout(r, 700));
+            }
+        } while(loop && !stopRequested);
+    } catch(err) {
+        console.error('Animation abgebrochen:', err);
+        showToast(translations[LANG].msgAnimError);
+    } finally {
+        field.querySelectorAll('.arrow-container.anim-current').forEach(a => a.classList.remove('anim-current'));
+        field.classList.remove('anim-playing');
+        isAnimating = false;
+        stopRequested = false;
+        playBtn.innerHTML = translations[LANG].playBtn;
+    }
 }
 playBtn.addEventListener('click', () => {
     if(isAnimating){ stopRequested = true; return; } // laufende Animation stoppen
@@ -1629,6 +1751,7 @@ const translations = {
         tacticNamePlaceholder: 'Taktikname...',
         tacticSelectDefault: '-- Laden --',
         saveBtn: '💾 Speichern',
+        loadBtn: '📂 Laden',
         deleteTacticBtn: '🗑️ Löschen',
         exportImgBtn: '🖼️ Als Bild speichern',
         aboutFooterBtn: 'Über TacticBoard',
@@ -1650,6 +1773,21 @@ const translations = {
         itemNames: { basketball:'🧺 Korb', volleyball:'🏐 Netz', default:'🥅 Tor' },
         msgEnterName: 'Bitte Taktikname eingeben!',
         msgSaved: 'Taktik erfolgreich gespeichert!',
+        msgTacticLoaded: (name) => 'Taktik "' + name + '" geladen.',
+        msgAnimError: 'Animation abgebrochen (fehlerhafte Daten?).',
+        importSquadBtn: '📋 Kader einfügen',
+        confirmDeleteTactic: 'Diese Taktik wirklich löschen?',
+        msgUpdated: 'Taktik aktualisiert.',
+        importTitle: 'Kader einfügen',
+        importHint: 'Teile den Spieltag im Kaderplaner und füge den Text hier ein. Die Spieler werden als Startaufstellung aufs Feld gesetzt, überzählige an die Seitenlinie.',
+        importPasteBtn: '📋 Einfügen',
+        importParseBtn: '🔍 Prüfen',
+        importApplyBtn: '✅ Aufs Feld',
+        importPlayers: 'Spieler',
+        msgImportNoSquad: 'Kein Kader erkannt. Steht der komplette Teilen-Text im Feld?',
+        msgPasteManually: 'Bitte von Hand einfügen (lange auf das Feld tippen).',
+        msgSquadPlaced: (n) => n + ' Spieler aufs Feld gesetzt.',
+        msgSelectTactic: 'Bitte zuerst eine Taktik im Auswahlfeld wählen.',
         msgSaveFailed: 'Speichern fehlgeschlagen (Speicher voll?).',
         msgDeleted: 'Taktik gelöscht.',
         msgFieldLoaded: (name) => name + ' geladen',
@@ -1710,6 +1848,7 @@ const translations = {
         tacticNamePlaceholder: 'Tactic name...',
         tacticSelectDefault: '-- Load --',
         saveBtn: '💾 Save',
+        loadBtn: '📂 Load',
         deleteTacticBtn: '🗑️ Delete',
         exportImgBtn: '🖼️ Save Image',
         aboutFooterBtn: 'About TacticBoard',
@@ -1731,6 +1870,21 @@ const translations = {
         itemNames: { basketball:'🧺 Basket', volleyball:'🏐 Net', default:'🥅 Goal' },
         msgEnterName: 'Please enter a tactic name!',
         msgSaved: 'Tactic saved successfully!',
+        msgTacticLoaded: (name) => 'Tactic "' + name + '" loaded.',
+        msgAnimError: 'Animation aborted (invalid data?).',
+        importSquadBtn: '📋 Import squad',
+        confirmDeleteTactic: 'Really delete this tactic?',
+        msgUpdated: 'Tactic updated.',
+        importTitle: 'Import squad',
+        importHint: 'Share a matchday in the squad planner and paste the text here. Players are placed as a starting line-up, extras go to the sideline.',
+        importPasteBtn: '📋 Paste',
+        importParseBtn: '🔍 Check',
+        importApplyBtn: '✅ Place on pitch',
+        importPlayers: 'players',
+        msgImportNoSquad: 'No squad found. Is the complete shared text in the field?',
+        msgPasteManually: 'Please paste manually (long-press the field).',
+        msgSquadPlaced: (n) => n + ' players placed on the pitch.',
+        msgSelectTactic: 'Please select a tactic from the list first.',
         msgSaveFailed: 'Save failed (storage full?).',
         msgDeleted: 'Tactic deleted.',
         msgFieldLoaded: (name) => name + ' loaded',
@@ -1793,12 +1947,21 @@ function applyLanguage(lang){
     tacticNameInput.placeholder = t.tacticNamePlaceholder;
     if(tacticSelect.options.length) tacticSelect.options[0].textContent = t.tacticSelectDefault;
     saveBtn.innerHTML = t.saveBtn;
+    loadBtn.innerHTML = t.loadBtn;
+    importSquadBtn.innerHTML = t.importSquadBtn;
+    document.getElementById('import-title').textContent = t.importTitle;
+    document.getElementById('import-hint').textContent = t.importHint;
+    importPasteBtn.innerHTML = t.importPasteBtn;
+    importParseBtn.innerHTML = t.importParseBtn;
+    importApplyBtn.innerHTML = t.importApplyBtn;
+    importCloseBtn.textContent = t.closeBtn;
     deleteTacticBtn.innerHTML = t.deleteTacticBtn;
     exportImgBtn.innerHTML = t.exportImgBtn;
     aboutFooterBtn.textContent = t.aboutFooterBtn;
     devCreditsEl.innerHTML = t.devCredits;
     const confirmTitleEl = document.querySelector('#custom-confirm .modal-title');
-    if(confirmTitleEl) confirmTitleEl.textContent = t.confirmTitle;
+    // beim Sprachwechsel den Text der gerade offenen Rueckfrage behalten
+    if(confirmTitleEl) confirmTitleEl.textContent = t[typeof confirmKey === 'string' ? confirmKey : 'confirmTitle'] || t.confirmTitle;
     confirmYes.textContent = t.yes;
     confirmNo.textContent = t.no;
     const aboutTitleEl = document.querySelector('#about-modal .modal-title');
@@ -1857,7 +2020,7 @@ document.querySelectorAll('.sport-btn-left').forEach(btn => {
     btn.addEventListener('click', () => {
         currentSport = btn.dataset.sport;
         field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove());
-        ctx.clearRect(0,0,canvas.width,canvas.height);
+        clearCanvasAll();
         clearHistory(); clearAnimBaseline();
         redCounter = 0; enemyCounter = 0;
         activePlayer = null; activeArrow = null; updateButtonVisibility();
@@ -1867,15 +2030,29 @@ document.querySelectorAll('.sport-btn-left').forEach(btn => {
         showToast(translations[LANG].msgFieldLoaded(translations[LANG].sportNames[currentSport]));
     });
 });
-clearAllBtn.addEventListener('click', () => customConfirm.style.display = 'flex');
-confirmYes.addEventListener('click', () => {
-    customConfirm.style.display = 'none';
+/* Ein Dialog fuer alle Rueckfragen: Titel und Aktion werden gesetzt,
+   bevor er geoeffnet wird. */
+let confirmKey = 'confirmTitle';
+let confirmAction = null;
+function askConfirm(titleKey, action){
+    confirmKey = titleKey;
+    confirmAction = action;
+    const el = document.querySelector('#custom-confirm .modal-title');
+    if(el) el.textContent = translations[LANG][titleKey];
+    customConfirm.style.display = 'flex';
+}
+clearAllBtn.addEventListener('click', () => askConfirm('confirmTitle', () => {
     field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove());
-    ctx.clearRect(0,0,canvas.width,canvas.height); clearHistory(); clearAnimBaseline();
+    clearCanvasAll(); clearHistory(); clearAnimBaseline();
     redCounter = 0; enemyCounter = 0;
     activePlayer = null; activeArrow = null; updateButtonVisibility();
+}));
+confirmYes.addEventListener('click', () => {
+    customConfirm.style.display = 'none';
+    const action = confirmAction; confirmAction = null;
+    if(typeof action === 'function') action();
 });
-confirmNo.addEventListener('click', () => customConfirm.style.display = 'none');
+confirmNo.addEventListener('click', () => { confirmAction = null; customConfirm.style.display = 'none'; });
 aboutFooterBtn.addEventListener('click', () => aboutModal.style.display = 'flex');
 closeAboutBtn.addEventListener('click', () => aboutModal.style.display = 'none');
 sizeSlider.addEventListener('input', () => {
@@ -1908,16 +2085,22 @@ saveBtn.addEventListener('click', () => {
     const arrows = [];
     field.querySelectorAll('.arrow-container').forEach(a => arrows.push({ points: JSON.parse(a.dataset.points || '[]'), color: a.dataset.color || '', dashed: a.dataset.dashed || 'false', targetOid: a.dataset.targetOid || '', step: a.dataset.step || '1', withBall: a.dataset.withBall || 'false', pace: a.dataset.pace || 'normal' }));
     
-    const list = getTactics(); const id = Date.now().toString();
-    list.push({ id, name, sport: currentSport, players, arrows, drawing: drawingStrokes });
+    const list = getTactics();
+    // Gleicher Name = dieselbe Taktik aktualisieren, statt einen zweiten
+    // ununterscheidbaren Eintrag im Dropdown anzulegen
+    const idx = list.findIndex(t => (t.name || '').trim().toLowerCase() === name.toLowerCase());
+    const id = idx >= 0 ? list[idx].id : Date.now().toString();
+    const entry = { id, name, sport: currentSport, players, arrows, drawing: drawingStrokes };
+    if(idx >= 0) list[idx] = entry; else list.push(entry);
     if(!saveTactics(list)){ showToast(translations[LANG].msgSaveFailed); return; }
     refreshTacticSelect(); tacticSelect.value = id; tacticNameInput.value = '';
-    showToast(translations[LANG].msgSaved);
+    showToast(translations[LANG][idx >= 0 ? 'msgUpdated' : 'msgSaved']);
 });
-tacticSelect.addEventListener('change', () => {
-    const t = getTactics().find(x => x.id === tacticSelect.value); if(!t) return;
+function loadTactic(id){
+    const t = getTactics().find(x => x.id === id);
+    if(!t){ showToast(translations[LANG].msgSelectTactic); return; }
     currentSport = t.sport || 'football'; renderFieldSVG(currentSport); updateContextButtons();
-    field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove()); ctx.clearRect(0,0,canvas.width,canvas.height);
+    field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove()); clearCanvasAll();
     clearHistory(); clearAnimBaseline();
     t.players.forEach(p => {
         const isSelectableObj = !p.className.includes('cone') && !p.className.includes('disc') && !p.className.includes('pole') && !p.className.includes('dummy');
@@ -1939,13 +2122,219 @@ tacticSelect.addEventListener('change', () => {
         drawingStrokes = t.drawing || [];
         redrawCanvas();
     }
-});
+    showToast(translations[LANG].msgTacticLoaded(t.name));
+}
+// Auswahl im Dropdown laedt direkt, der Laden-Button laedt die aktuelle Auswahl
+// erneut (wichtig, weil ein erneutes Waehlen des gleichen Eintrags kein
+// 'change'-Event ausloest - genau das war der Grund, warum sich eine gerade
+// gespeicherte Taktik nicht laden liess).
+tacticSelect.addEventListener('change', () => { if(tacticSelect.value) loadTactic(tacticSelect.value); });
+loadBtn.addEventListener('click', () => loadTactic(tacticSelect.value));
 deleteTacticBtn.addEventListener('click', () => {
-    if(!tacticSelect.value) return;
-    const ok = saveTactics(getTactics().filter(x => x.id !== tacticSelect.value));
-    if(!ok){ showToast(translations[LANG].msgSaveFailed); return; }
-    refreshTacticSelect(); tacticSelect.value = '';
-    showToast(translations[LANG].msgDeleted);
+    const id = tacticSelect.value;
+    if(!id){ showToast(translations[LANG].msgSelectTactic); return; }
+    askConfirm('confirmDeleteTactic', () => {
+        const ok = saveTactics(getTactics().filter(x => x.id !== id));
+        if(!ok){ showToast(translations[LANG].msgSaveFailed); return; }
+        refreshTacticSelect(); tacticSelect.value = '';
+        showToast(translations[LANG].msgDeleted);
+    });
+});
+
+
+/* ---------------------------------------------------
+   KADER-IMPORT (Teilen-Text des U11-Kaderplaners)
+--------------------------------------------------- */
+const importSquadBtn   = document.getElementById('import-squad-btn');
+const importSquadModal = document.getElementById('import-squad-modal');
+const importTextArea   = document.getElementById('import-text');
+const importPasteBtn   = document.getElementById('import-paste-btn');
+const importParseBtn   = document.getElementById('import-parse-btn');
+const importPreview    = document.getElementById('import-preview');
+const importApplyBtn   = document.getElementById('import-apply-btn');
+const importCloseBtn   = document.getElementById('import-close-btn');
+
+let importBlocks = [];
+let importSel = -1;
+
+/* Toleranter Parser: Leerzeilen, fehlende Felder, fremde Zeilen davor
+   und dahinter sowie ein einzelner statt zwei Kader sind erlaubt. */
+function parseSquadText(text){
+    const lines = String(text || '').replace(/\r/g, '').split('\n');
+    const RE_HEADER  = /^\*?\s*(.+?)\s*·\s*(.+?)\s*\*?$/;
+    const RE_SQUAD   = /^\*?\s*Kader\s*\((\d+)\)\s*\*?$/i;
+    const RE_PLAYER  = /^\s*(\d{1,2})[.)]\s+(.+?)\s*$/;
+    const RE_KICKOFF = /^\s*Ansto[ßs]+:\s*(\d{1,2}:\d{2})/i;
+    const RE_OPP     = /\bgegen\s+(.+?)\s*$/i;
+    const RE_HOME    = /^\s*(Heimspiel|Ausw[äa]rtsspiel)\b/i;
+    const RE_DATE    = /(\d{1,2}\.\d{1,2}\.\d{2,4})/;
+
+    const blocks = [];
+    let cur = null, inSquad = false;
+    const finish = () => { if(cur && cur.players.length) blocks.push(cur); cur = null; inSquad = false; };
+
+    for(const raw of lines){
+        const line = raw.trim();
+        const h = line.match(RE_HEADER);
+        if(h && RE_DATE.test(h[2]) && !RE_PLAYER.test(line)){
+            finish();
+            cur = { team: h[1].replace(/\*/g, '').trim().slice(0, 60), date: h[2].trim().slice(0, 40),
+                    opponent: '', home: null, kickoff: '', players: [] };
+            continue;
+        }
+        if(!cur) continue;
+        if(RE_SQUAD.test(line)){ inSquad = true; continue; }
+        if(!inSquad){
+            const hm = line.match(RE_HOME); if(hm) cur.home = /^Heim/i.test(hm[1]);
+            const om = line.match(RE_OPP);  if(om) cur.opponent = om[1].replace(/\s*\(Freundschaftsspiel\)\s*$/i, '').trim().slice(0, 60);
+            const km = line.match(RE_KICKOFF); if(km) cur.kickoff = km[1];
+            continue;
+        }
+        if(line === '') continue;
+        const pm = line.match(RE_PLAYER);
+        if(pm){
+            let name = pm[2].trim();
+            const keeper = /\(TW\)\s*$/i.test(name);
+            if(keeper) name = name.replace(/\s*\(TW\)\s*$/i, '').trim();
+            if(name && cur.players.length < 40) cur.players.push({ number: pm[1], name: name.slice(0, 40), keeper });
+        } else {
+            inSquad = false;
+        }
+    }
+    finish();
+    return blocks;
+}
+
+/* Eindeutige Anzeigenamen: Vorname, bei Doppelungen mit Anfangsbuchstabe
+   des Nachnamens (sonst waeren zwei "David" nicht unterscheidbar) */
+function squadDisplayNames(players){
+    const firsts = players.map(p => p.name.split(/\s+/)[0]);
+    return players.map((p, i) => {
+        if(firsts.filter(f => f === firsts[i]).length === 1) return firsts[i];
+        const rest = p.name.split(/\s+/).slice(1).join('').replace(/\./g, '');
+        return rest ? firsts[i] + ' ' + rest.charAt(0).toUpperCase() : firsts[i] + p.number;
+    });
+}
+
+/* Spielform aus dem Mannschaftsnamen: "... U11 III" = 4+1, sonst 6+1 */
+function fieldPlayersFor(teamName){ return /\bIII\b/i.test(teamName || '') ? 4 : 6; }
+
+/* Startaufstellung als Mittelpunkte in Prozent (eigenes Tor links) */
+function formationFor(n){
+    if(n <= 4) return [[24,28],[24,64],[46,28],[46,64]];              // 2-2
+    return [[22,30],[22,62],[42,18],[42,46],[42,74],[60,46]];         // 2-3-1
+}
+
+/* Mittelpunkt -> left/top eines Spielerkreises.
+   Breite 9% der Feldbreite entspricht 13.5% der Feldhoehe (Seitenverhaeltnis 3:2). */
+function centerToStyle(cx, cy){
+    const l = Math.max(0, Math.min(91, cx - 4.5));
+    const t = Math.max(0, Math.min(86.5, cy - 6.75));
+    return { left: l + '%', top: t + '%' };
+}
+
+function renderImportPreview(){
+    importPreview.innerHTML = '';
+    importBlocks.forEach((b, i) => {
+        const div = document.createElement('div');
+        div.className = 'import-block' + (i === importSel ? ' sel' : '');
+        // textContent statt innerHTML: der eingefuegte Text stammt aus der
+        // Zwischenablage und darf kein Markup in die Seite bringen
+        const head = document.createElement('div');
+        const strong = document.createElement('b');
+        strong.textContent = b.team;
+        const opp = b.opponent ? (b.home === false ? ' bei ' : ' gegen ') + b.opponent : '';
+        head.appendChild(strong);
+        head.appendChild(document.createTextNode(
+            ' \u00b7 ' + b.date + opp +
+            (b.kickoff ? ' \u00b7 ' + b.kickoff : '') +
+            ' \u2014 ' + b.players.length + ' ' + translations[LANG].importPlayers +
+            ' (' + fieldPlayersFor(b.team) + '+1)'));
+        const names = document.createElement('div');
+        names.className = 'names';
+        names.textContent = squadDisplayNames(b.players)
+            .map((n, k) => n + (b.players[k].keeper ? ' (TW)' : '')).join(' · ');
+        div.appendChild(head); div.appendChild(names);
+        div.addEventListener('click', () => { importSel = i; renderImportPreview(); });
+        importPreview.appendChild(div);
+    });
+    importApplyBtn.disabled = importSel < 0;
+}
+
+function runImportParse(){
+    importBlocks = parseSquadText(importTextArea.value);
+    importSel = importBlocks.length ? 0 : -1;
+    if(!importBlocks.length){
+        importPreview.innerHTML = '';
+        importApplyBtn.disabled = true;
+        showToast(translations[LANG].msgImportNoSquad);
+        return;
+    }
+    renderImportPreview();
+}
+
+function applySquadToField(block){
+    // Nur Spielerkreise ersetzen - Baelle, Tore, Geraete, Pfeile und
+    // Zeichnungen bleiben unberuehrt stehen
+    field.querySelectorAll('.player').forEach(el => {
+        const c = el.className;
+        if(c.includes('ball') || c.includes('cone') || c.includes('item-obj') ||
+           c.includes('disc') || c.includes('pole') || c.includes('dummy') || c.includes('puck')) return;
+        el.remove();
+    });
+    selectPlayer(null);
+    clearAnimBaseline();
+
+    const names = squadDisplayNames(block.players);
+    const keeperIdx = block.players.findIndex(p => p.keeper);
+    const order = [];
+    if(keeperIdx >= 0) order.push(keeperIdx);
+    block.players.forEach((p, i) => { if(i !== keeperIdx) order.push(i); });
+
+    const slots = [];
+    if(keeperIdx >= 0) slots.push([6, 46]);                       // Torwart ins Tor
+    formationFor(fieldPlayersFor(block.team)).forEach(c => slots.push(c));
+
+    order.forEach((idx, pos) => {
+        let cx, cy;
+        if(pos < slots.length){ cx = slots[pos][0]; cy = slots[pos][1]; }
+        else {                                                     // Auswechselspieler an die Seitenlinie
+            const sub = pos - slots.length;
+            cx = 10 + (sub % 8) * 11;
+            cy = 92 + Math.floor(sub / 8) * 10;
+        }
+        const st = centerToStyle(cx, cy);
+        const el = createObject('player', names[idx], st.left, st.top, 9, true);
+        setupDoubleClickToggle(el);
+    });
+
+    // Taktikname vorschlagen: "Barrien II · 21.08."
+    const dm = (block.date || '').match(/(\d{1,2}\.\d{1,2}\.)/);
+    const suggestion = [block.opponent, dm ? dm[1] : ''].filter(Boolean).join(' · ');
+    if(suggestion && !tacticNameInput.value.trim()) tacticNameInput.value = suggestion;
+
+    importSquadModal.style.display = 'none';
+    updateButtonVisibility();
+    showToast(translations[LANG].msgSquadPlaced(block.players.length));
+}
+
+importSquadBtn.addEventListener('click', () => {
+    importBlocks = []; importSel = -1;
+    importPreview.innerHTML = ''; importApplyBtn.disabled = true;
+    importSquadModal.style.display = 'flex';
+});
+importCloseBtn.addEventListener('click', () => importSquadModal.style.display = 'none');
+importParseBtn.addEventListener('click', runImportParse);
+importApplyBtn.addEventListener('click', () => {
+    if(importSel >= 0 && importBlocks[importSel]) applySquadToField(importBlocks[importSel]);
+});
+importPasteBtn.addEventListener('click', async () => {
+    try {
+        const txt = await navigator.clipboard.readText();
+        if(txt){ importTextArea.value = txt; runImportParse(); return; }
+    } catch(e){ /* Zwischenablage nicht erlaubt - dann von Hand einfuegen */ }
+    importTextArea.focus();
+    showToast(translations[LANG].msgPasteManually);
 });
 
 /* ---------------------------------------------------
@@ -1971,6 +2360,90 @@ exportTacticsBtn.addEventListener('click', () => {
     setTimeout(() => URL.revokeObjectURL(link.href), 10000);
     showToast(chosen.length === 1 ? translations[LANG].msgExportedOne : translations[LANG].msgExportedAll);
 });
+/* ---- Pruefung importierter Taktikdateien ----------------------------
+   Der JSON-Import ist die einzige Stelle, an der fremde Daten in die App
+   kommen. Alles wird auf bekannte Werte zurechtgestutzt; was nicht passt,
+   faellt weg, statt als kaputtes Objekt auf dem Feld zu landen. */
+const ALLOWED_CLASSES = ['player','enemy','ball','handball','puck','cone','item-obj','disc','pole','dummy','ladder'];
+const ALLOWED_SPORTS  = ['football','basketball','handball','volleyball','icehockey'];
+const ALLOWED_PACE    = ['slow','normal','fast'];
+
+function cleanClassName(raw){
+    const tokens = String(raw || '').split(/\s+/).filter(t => ALLOWED_CLASSES.indexOf(t) !== -1);
+    if(tokens.indexOf('player') === -1) tokens.unshift('player');
+    return [...new Set(tokens)].join(' ');
+}
+function cleanPercent(raw, fallback){
+    const v = parseFloat(raw);
+    if(!isFinite(v)) return fallback;
+    return Math.max(-20, Math.min(120, v)) + '%';
+}
+function cleanColor(raw){
+    const v = String(raw || '').trim();
+    return /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\))$/i.test(v) ? v : '';
+}
+function cleanText(raw){ return String(raw == null ? '' : raw).slice(0, 40); }
+
+function sanitizeTactic(t){
+    if(!t || typeof t !== 'object' || !t.name || !Array.isArray(t.players)) return null;
+    const players = t.players.slice(0, 60).map(p => {
+        if(!p || typeof p !== 'object') return null;
+        return {
+            className: cleanClassName(p.className),
+            text: cleanText(p.text),
+            left: cleanPercent(p.left, '46%'), top: cleanPercent(p.top, '46%'),
+            width: p.width ? cleanPercent(p.width, '') : '',
+            height: p.height ? cleanPercent(p.height, '') : '',
+            color: cleanColor(p.color),
+            oid: String(p.oid || '').replace(/[^\w-]/g, '').slice(0, 40),
+            variant: String(p.variant || '').slice(0, 20).replace(/[^a-z]/gi, ''),
+            rotation: isFinite(parseFloat(p.rotation)) ? String(parseFloat(p.rotation) % 360) : ''
+        };
+    }).filter(Boolean);
+    if(players.length === 0) return null;
+
+    const arrows = (Array.isArray(t.arrows) ? t.arrows : []).slice(0, 60).map(a => {
+        if(!a || typeof a !== 'object') return null;
+        const pts = (Array.isArray(a.points) ? a.points : []).slice(0, 12)
+            .map(pt => pt && isFinite(pt.x) && isFinite(pt.y)
+                ? { x: Math.max(-20, Math.min(120, +pt.x)), y: Math.max(-20, Math.min(120, +pt.y)) } : null)
+            .filter(Boolean);
+        return {
+            points: pts,
+            color: cleanColor(a.color), dashed: a.dashed === 'true' || a.dashed === true ? 'true' : 'false',
+            targetOid: String(a.targetOid || '').replace(/[^\w-]/g, '').slice(0, 40),
+            step: String(Math.max(1, Math.min(20, parseInt(a.step, 10) || 1))),
+            withBall: a.withBall === 'true' || a.withBall === true ? 'true' : 'false',
+            pace: ALLOWED_PACE.indexOf(a.pace) !== -1 ? a.pace : 'normal'
+        };
+    }).filter(a => a && a.points.length >= 2);
+
+    let drawing = [];
+    if(typeof t.drawing === 'string' && t.drawing.startsWith('data:image/')){
+        drawing = t.drawing;                       // Altformat: Hintergrundbild
+    } else if(Array.isArray(t.drawing)){
+        drawing = t.drawing.slice(0, 400).map(st => {
+            if(!st || !Array.isArray(st.points)) return null;
+            const points = st.points.slice(0, 2000)
+                .map(pt => pt && isFinite(pt.x) && isFinite(pt.y) ? { x: +pt.x, y: +pt.y } : null)
+                .filter(Boolean);
+            if(points.length === 0) return null;
+            return {
+                color: st.color === 'erase' ? 'erase' : (cleanColor(st.color) || '#e63946'),
+                width: Math.max(1, Math.min(80, parseFloat(st.width) || 4)),
+                style: st.style === 'dashed' ? 'dashed' : 'solid',
+                points
+            };
+        }).filter(Boolean);
+    }
+
+    return {
+        id: '', name: cleanText(t.name),
+        sport: ALLOWED_SPORTS.indexOf(t.sport) !== -1 ? t.sport : 'football',
+        players, arrows, drawing
+    };
+}
+
 importTacticsBtn.addEventListener('click', () => importFileInput.click());
 importFileInput.addEventListener('change', () => {
     const file = importFileInput.files && importFileInput.files[0];
@@ -1980,7 +2453,9 @@ importFileInput.addEventListener('change', () => {
         try {
             const data = JSON.parse(reader.result);
             let incoming = Array.isArray(data) ? data : (data.tactics || (data.players ? [data] : []));
-            incoming = incoming.filter(t => t && t.name && Array.isArray(t.players));
+            // Fremde Dateien werden nicht ungeprueft uebernommen: nur bekannte
+            // Klassen, Zahlen in gueltigen Bereichen, Rest wird verworfen
+            incoming = incoming.map(sanitizeTactic).filter(Boolean);
             if(incoming.length === 0) throw new Error('keine Taktiken');
             const list = getTactics();
             incoming.forEach((t, i) => { t.id = (Date.now() + i).toString(); list.push(t); });
