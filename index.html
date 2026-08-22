@@ -215,28 +215,24 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
 .modal-title { font-weight:bold; font-size:22px; margin-bottom:15px; color: #4caf50;}
 .modal-text { font-size: 14px; line-height: 1.6; margin-bottom: 20px; text-align: left;}
 
-/* QUERFORMAT: Feld links in voller Hoehe, Bedienelemente rechts daneben.
-   Die Klasse wird von fitFieldToScreen() gesetzt, damit CSS und die
-   Groessenberechnung immer dieselbe Entscheidung treffen. */
+/* QUERFORMAT: Das Feld steht ganz oben und bekommt die komplette
+   Bildschirmhoehe. Alle Bedienelemente liegen darunter und werden
+   gescrollt. Kopfzeile schlank, Fusszeile nicht mehr fixiert - beides
+   wuerde sonst nur Hoehe kosten, die dem Feld fehlt.
+   Die Klasse wird von fitFieldToScreen() gesetzt, damit CSS und
+   Groessenberechnung dieselbe Entscheidung treffen. */
 body.landscape-fit .container {
     max-width:none;
-    display:grid;
-    grid-template-columns: var(--field-max-w) minmax(220px, 1fr);
-    gap:12px;
-    align-items:start;
-    padding:0 12px 90px 12px;
+    display:flex; flex-direction:column;
+    padding:0 12px 16px 12px;
 }
-body.landscape-fit #zoom-wrapper {
-    grid-column:1; grid-row:1 / span 2;
-    width: var(--field-max-w); max-width: var(--field-max-w);
-    margin:12px 0 0 0;
-    position:sticky; top:8px;
-}
-body.landscape-fit #setup-controls { grid-column:2; grid-row:1; margin-top:12px; }
-body.landscape-fit #tools-controls  { grid-column:2; grid-row:2; }
-body.landscape-fit .header { padding:6px 12px; }
-body.landscape-fit #appName { font-size:20px; }
-body.landscape-fit footer { padding:6px 12px; }
+body.landscape-fit #zoom-wrapper { order:-1; margin:8px auto 10px auto; }
+body.landscape-fit #setup-controls { margin-top:0; }
+body.landscape-fit .header { padding:4px 12px; }
+body.landscape-fit #appName { font-size:18px; }
+body.landscape-fit #appName::after { font-size:11px; }
+body.landscape-fit #langFlags img { width:26px; height:16px; }
+body.landscape-fit footer { position:static; padding:10px 12px; }
 body.landscape-fit .dev-credits { font-size:11px; }
 
 /* TOAST NOTIFICATION */
@@ -584,8 +580,8 @@ function resizeCanvas(){
    Das Feld hat das Seitenverhaeltnis 3:2. Damit es auf jedem Geraet den
    verfuegbaren Platz ausnutzt, wird die maximale Feldbreite aus der
    tatsaechlichen Fenstergroesse berechnet statt aus einer festen
-   vh-Formel. Im Querformat steht das Feld links neben den Bedienelementen
-   und nutzt die volle Hoehe zwischen Kopf- und Fusszeile.
+   vh-Formel. Im Querformat steht das Feld ganz oben und nutzt die volle
+   Hoehe unter der Kopfzeile; die Bedienelemente liegen darunter.
 --------------------------------------------------- */
 const FIELD_RATIO = 1.5;          // 3:2
 const FIELD_MIN_W = 240;          // darunter wird nichts mehr bedienbar
@@ -604,13 +600,14 @@ function fitFieldToScreen(){
     const footerEl = document.querySelector('footer');
     const setupEl  = document.getElementById('setup-controls');
     const headerH = headerEl ? headerEl.offsetHeight : 56;
-    const footerH = footerEl ? footerEl.offsetHeight : 56;
+    const footerH = (footerEl && !landscape) ? footerEl.offsetHeight : 0;
     const setupH  = setupEl  ? setupEl.offsetHeight  : 60;
 
     let availH, maxW;
     if(landscape){
-        availH = vh - headerH - footerH - 24;
-        maxW = Math.min(availH * FIELD_RATIO, vw * 0.62);
+        /* Fusszeile ist im Querformat nicht fixiert und kostet keine Hoehe. */
+        availH = vh - headerH - 26;
+        maxW = Math.min(availH * FIELD_RATIO, vw - 24);
     } else {
         availH = vh - headerH - footerH - setupH - 48;
         maxW = Math.min(availH * FIELD_RATIO, vw - 32);
@@ -624,11 +621,15 @@ function fitFieldToScreen(){
 }
 
 let fitPending = false;
-function handleViewportChange(){
+function handleViewportChange(force){
     /* Bei geoeffneter Tastatur meldet der Browser eine kleinere Hoehe.
-       Dann wird nicht neu berechnet, sonst schrumpft das Feld beim Tippen. */
-    const ae = document.activeElement;
-    if(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.type !== 'range') return;
+       Dann wird nicht neu berechnet, sonst schrumpft das Feld beim Tippen.
+       Beim Drehen (force) wird die Sperre bewusst uebergangen. */
+    if(!force){
+        const ae = document.activeElement;
+        const tag = ae ? ae.tagName : '';
+        if((tag === 'INPUT' && ae.type !== 'range') || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    }
     if(fitPending) return;
     fitPending = true;
     requestAnimationFrame(() => {
@@ -639,9 +640,14 @@ function handleViewportChange(){
 }
 
 fitFieldToScreen();
-window.addEventListener('load', handleViewportChange);
-window.addEventListener('resize', handleViewportChange);
-window.addEventListener('orientationchange', () => setTimeout(handleViewportChange, 150));
+window.addEventListener('load', () => handleViewportChange(true));
+window.addEventListener('resize', () => handleViewportChange(false));
+/* Manche WebViews melden direkt nach dem Drehen noch die alten Masse,
+   daher zweimal nachfassen. */
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => handleViewportChange(true), 150);
+    setTimeout(() => handleViewportChange(true), 500);
+});
 
 /* ---------------------------------------------------
    DRAWING (VEKTOR) + UNDO HISTORY
