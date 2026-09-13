@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Hintergrundfarbe des adaptiven App-Icons (TacticBoard-Rasengruen) -->
-    <color name="tb_icon_background">#3d9c41</color>
-</resources>
