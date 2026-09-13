@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="cordova-plugin-tb-share"
+        version="1.0.0">
+
+    <name>TbShare</name>
+    <description>Teilt in JavaScript erzeugte Dateien ueber das Android-Teilen-Menue.</description>
+    <license>MIT</license>
+
+    <engines>
+        <engine name="cordova-android" version=">=12.0.0" />
+    </engines>
+
+    <js-module src="www/tbshare.js" name="TbShare">
+        <clobbers target="TbShare" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="TbShare">
+                <param name="android-package" value="de.tacticboard.share.TbShare" />
+            </feature>
+        </config-file>
+
+        <!-- FileProvider: gibt die Exportdatei als content://-URI weiter,
+             statt einen file://-Pfad zu teilen. Ohne das wirft Android ab
+             API 24 eine FileUriExposedException. -->
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <provider
+                android:name="androidx.core.content.FileProvider"
+                android:authorities="${applicationId}.tbshare"
+                android:exported="false"
+                android:grantUriPermissions="true">
+                <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@xml/tb_file_paths" />
+            </provider>
+        </config-file>
+
+        <source-file src="src/android/TbShare.java" target-dir="src/de/tacticboard/share" />
+        <resource-file src="src/android/tb_file_paths.xml" target="res/xml/tb_file_paths.xml" />
+    </platform>
+</plugin>

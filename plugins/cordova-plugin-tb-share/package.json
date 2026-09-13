@@ -1,0 +1,20 @@
+{
+  "name": "cordova-plugin-tb-share",
+  "version": "1.0.0",
+  "description": "Teilt in JavaScript erzeugte Dateien ueber das Android-Teilen-Menue.",
+  "cordova": {
+    "id": "cordova-plugin-tb-share",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "cordova",
+    "android",
+    "share",
+    "ecosystem:cordova",
+    "cordova-android"
+  ],
+  "author": "Simon Mählmann",
+  "license": "MIT"
+}
