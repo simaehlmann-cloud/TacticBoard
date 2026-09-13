@@ -38,7 +38,11 @@
             </provider>
         </config-file>
 
-        <source-file src="src/android/TbShare.java" target-dir="src/de/tacticboard/share" />
-        <resource-file src="src/android/tb_file_paths.xml" target="res/xml/tb_file_paths.xml" />
+        <!-- Die Quelldateien liegen flach im Plugin-Ordner, nicht unter
+             src/android/. Bei nur einer Plattform bringt die Verschachtelung
+             nichts und macht das Anlegen ueber die GitHub-Weboberflaeche
+             unnoetig fehleranfaellig. -->
+        <source-file src="TbShare.java" target-dir="src/de/tacticboard/share" />
+        <resource-file src="tb_file_paths.xml" target="res/xml/tb_file_paths.xml" />
     </platform>
 </plugin>
