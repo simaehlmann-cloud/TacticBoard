@@ -1,7 +1,13 @@
 package de.tacticboard.share;
 
+import android.content.ClipData;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 
 import androidx.core.content.FileProvider;
 
@@ -32,7 +38,8 @@ public class TbShare extends CordovaPlugin {
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext)
             throws JSONException {
-        if (!"shareFile".equals(action)) {
+        final boolean inGalerie = "saveImage".equals(action);
+        if (!inGalerie && !"shareFile".equals(action)) {
             return false;
         }
 
@@ -42,8 +49,15 @@ public class TbShare extends CordovaPlugin {
 
         cordova.getThreadPool().execute(() -> {
             try {
-                teile(dateiname, mimeTyp, base64);
-                callbackContext.success();
+                if (inGalerie && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    callbackContext.success(inGalerieSichern(dateiname, mimeTyp, base64));
+                } else {
+                    // Vor Android 10 braeuchte das Schreiben in die Galerie eine
+                    // Speicher-Berechtigung. Die wollen wir nicht anfragen, also
+                    // bekommen diese Geraete das Teilen-Menue.
+                    teile(dateiname, mimeTyp, base64);
+                    callbackContext.success("");
+                }
             } catch (Exception e) {
                 callbackContext.error(e.getClass().getSimpleName() + ": " + e.getMessage());
             }
@@ -72,6 +86,9 @@ public class TbShare extends CordovaPlugin {
 
         File ziel = new File(ordner, saeubere(dateiname));
         byte[] daten = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+        if (daten.length == 0) {
+            throw new IllegalStateException("Leere Datei - Base64 konnte nicht dekodiert werden");
+        }
         try (OutputStream out = new FileOutputStream(ziel)) {
             out.write(daten);
         }
@@ -84,10 +101,58 @@ public class TbShare extends CordovaPlugin {
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.putExtra(Intent.EXTRA_TITLE, ziel.getName());
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        // Entscheidend: ohne ClipData gibt Android die Leseerlaubnis nicht an die
+        // vom Auswahldialog gestartete App weiter. Der Anhang ist dann sichtbar,
+        // aber nicht lesbar - Mail verschickt nichts, WhatsApp bricht ab.
+        intent.setClipData(ClipData.newUri(cordova.getActivity().getContentResolver(),
+                ziel.getName(), uri));
 
         Intent auswahl = Intent.createChooser(intent, null);
         auswahl.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         cordova.getActivity().startActivity(auswahl);
+    }
+
+    /**
+     * Legt das Bild ueber den MediaStore in Bilder/TacticBoard ab. Ab Android 10
+     * ist dafuer keine Berechtigung noetig, und die Galerie findet es sofort.
+     *
+     * @return der angezeigte Ordner, fuer die Rueckmeldung an den Nutzer
+     */
+    private String inGalerieSichern(String dateiname, String mimeTyp, String base64)
+            throws Exception {
+        byte[] daten = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+        if (daten.length == 0) {
+            throw new IllegalStateException("Leere Datei - Base64 konnte nicht dekodiert werden");
+        }
+
+        String ordner = Environment.DIRECTORY_PICTURES + "/TacticBoard";
+        ContentResolver resolver = cordova.getActivity().getContentResolver();
+
+        ContentValues werte = new ContentValues();
+        werte.put(MediaStore.MediaColumns.DISPLAY_NAME, saeubere(dateiname));
+        werte.put(MediaStore.MediaColumns.MIME_TYPE, mimeTyp);
+        werte.put(MediaStore.MediaColumns.RELATIVE_PATH, ordner);
+        werte.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+        Uri ziel = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, werte);
+        if (ziel == null) {
+            throw new IllegalStateException("MediaStore lieferte keinen Eintrag");
+        }
+        try (OutputStream out = resolver.openOutputStream(ziel)) {
+            if (out == null) {
+                throw new IllegalStateException("MediaStore-Datei nicht beschreibbar");
+            }
+            out.write(daten);
+        } catch (Exception e) {
+            // Halbfertigen Eintrag nicht in der Galerie zuruecklassen
+            resolver.delete(ziel, null, null);
+            throw e;
+        }
+
+        werte.clear();
+        werte.put(MediaStore.MediaColumns.IS_PENDING, 0);
+        resolver.update(ziel, werte, null, null);
+        return ordner;
     }
 
     /**
