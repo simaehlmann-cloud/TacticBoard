@@ -7,14 +7,16 @@
  *   - Uebrige Assets (Icons, Bibliotheken, datenschutz.html): CACHE FIRST,
  *     da sie sich praktisch nie aendern und offline sofort da sein muessen.
  */
-const CACHE_NAME = 'tacticboard-v3.2';
+const CACHE_NAME = 'tacticboard-v3.3';
 const SHELL = './index.html';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './image.png',
-  './datenschutz.html'
+  './icon_maskable.png',
+  './datenschutz.html',
+  './impressum.html'
 ];
 
 self.addEventListener('install', event => {

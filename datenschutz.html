@@ -1,105 +1,170 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Datenschutzerklärung – TacticBoard</title>
+<meta name="theme-color" content="#1a1a1a">
 <style>
-body { margin:0; padding:0; background:#222; color:#eee; font-family:Arial,Helvetica,sans-serif; line-height:1.7; }
-.wrap { max-width:760px; margin:0 auto; padding:24px 20px 60px 20px; }
-h1 { color:#4caf50; font-size:28px; }
-h2 { color:#4caf50; font-size:20px; margin-top:32px; }
-a { color:#8fd694; }
-.box { background:#2e2e2e; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px 20px; margin:20px 0; }
-.muted { color:#aaa; font-size:13px; margin-top:40px; }
+  :root { --bg:#d8f0da; --card:#fff; --text:#1b3a1f; --border:#3d9c41; --muted:#4a6a4f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1a1a1a; --card:#242424; --text:#e9efe9; --border:#4caf50; --muted:#9fb3a2; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; padding:24px 16px calc(40px + env(safe-area-inset-bottom));
+    background:var(--bg); color:var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height:1.6;
+  }
+  main { max-width:760px; margin:0 auto; background:var(--card);
+         border:3px solid var(--border); border-radius:12px; padding:24px; }
+  h1 { font-size:clamp(24px,5vw,32px); margin:0 0 4px; }
+  h2 { font-size:clamp(18px,4vw,22px); margin:32px 0 8px; }
+  .stand { color:var(--muted); font-size:14px; margin:0 0 24px; }
+  address { font-style:normal; }
+  ul { padding-left:20px; }
+  li { margin:6px 0; }
+  a { color:var(--border); }
+  .links { margin-top:32px; display:flex; flex-wrap:wrap; gap:12px; }
+  .links a { display:inline-block; padding:12px 20px; background:var(--border);
+             color:#fff; border-radius:10px; text-decoration:none; font-weight:600; }
 </style>
 </head>
 <body>
-<div class="wrap">
-<h1>Datenschutzerklärung</h1>
-<p><strong>TacticBoard</strong> – digitale Taktiktafel für das Sport-Training</p>
+<main>
+  <h1>Datenschutzerklärung</h1>
+  <p class="stand">TacticBoard · Stand: September 2026</p>
 
-<div class="box">
-<strong>Das Wichtigste in Kürze:</strong> TacticBoard erhebt, speichert und übermittelt
-<strong>keine personenbezogenen Daten</strong>. Die App funktioniert vollständig offline.
-Alle Inhalte (Taktiken, Aufstellungen, Animationen) werden ausschließlich lokal auf
-deinem Gerät gespeichert und verlassen es nur, wenn du sie selbst aktiv exportierst oder teilst.
-</div>
+  <h2>1. Verantwortlicher</h2>
+  <p>Verantwortlich im Sinne von Art. 4 Nr. 7 DSGVO ist:</p>
+  <address>
+    Wisdompeak Apps<br>
+    Inhaber: Simon Mählmann<br>
+    Oderstraße 13<br>
+    28844 Weyhe<br>
+    Deutschland<br>
+    E-Mail: <a href="mailto:smaehlmann.appdev@gmail.com">smaehlmann.appdev@gmail.com</a>
+  </address>
+  <p>
+    Ein Datenschutzbeauftragter ist nicht bestellt, da die Voraussetzungen des Art. 37 DSGVO
+    und des § 38 BDSG nicht vorliegen.
+  </p>
 
-<h2>1. Verantwortlicher</h2>
-<p>
-Simon Mählmann<br />
-E-Mail: <a href="mailto:info@taktiktafel.de">info@taktiktafel.de</a><br />
-Web: <a href="http://taktiktafel.de">taktiktafel.de</a>
-</p>
+  <h2>2. Grundsatz: keine Datenerhebung</h2>
+  <p>
+    TacticBoard verarbeitet keine personenbezogenen Daten auf Servern des Anbieters.
+    Die App arbeitet vollständig offline. Es gibt keine Benutzerkonten, keine Registrierung,
+    keine Analyse- oder Trackingdienste, keine Werbung und keine Weitergabe von Daten an Dritte.
+  </p>
 
-<h2>2. Welche Daten verarbeitet die App?</h2>
-<p>
-TacticBoard benötigt <strong>kein Benutzerkonto</strong> und fragt keine persönlichen
-Angaben ab. Die von dir erstellten Inhalte – Aufstellungen, Taktiken, Spielernamen bzw.
--nummern, Zeichnungen und Animationen – werden ausschließlich im lokalen Speicher
-deines Geräts (App-Speicher / localStorage) abgelegt. Es findet keine Übertragung an
-den Entwickler oder an Dritte statt.
-</p>
+  <h2>3. Welche Daten auf dem Gerät gespeichert werden</h2>
+  <p>Alle Eingaben verbleiben ausschließlich im lokalen Speicher des Geräts. Gespeichert werden:</p>
+  <ul>
+    <li>die von Ihnen gespeicherten Taktiken – also Positionen von Spielern, Gegnern,
+        Bällen, Toren und Trainingsgeräten, gezeichnete Linien, Pfeile und Animationsschritte</li>
+    <li>die von Ihnen vergebenen Beschriftungen der Spielerkreise, also Rückennummern
+        oder Namen, sowie die Namen der gespeicherten Taktiken</li>
+    <li>Ihre Einstellungen zu Sprache und Feldgröße</li>
+    <li>der Hinweis, dass die Kurzanleitung bereits angezeigt wurde</li>
+  </ul>
+  <p>
+    Diese Daten werden über die Browser-Technik <em>localStorage</em> im geschützten
+    App-Verzeichnis abgelegt. Sie werden zu keinem Zeitpunkt übertragen.
+    Beim Deinstallieren der App oder über das Löschen der App-Daten in den
+    Geräteeinstellungen werden sie vollständig entfernt. Einzelne Taktiken können
+    Sie jederzeit direkt in der App löschen.
+  </p>
 
-<h2>3. Berechtigungen und Internetzugriff</h2>
-<p>
-Die App verwendet keine Standortdaten, keine Kamera, kein Mikrofon und liest keine
-Kontakte aus. Ein Internetzugriff ist für die Nutzung nicht erforderlich. Exportierte
-Dateien (Bilder, GIFs, Taktik-Dateien) werden nur auf deine ausdrückliche Aktion hin
-erzeugt und auf deinem Gerät gespeichert; das Teilen dieser Dateien erfolgt über die
-von dir gewählten Apps und liegt in deiner Hand.
-</p>
+  <h2>4. Hinweis zur Eingabe von Namen Dritter</h2>
+  <p>
+    Wenn Sie Namen von Spielerinnen und Spielern eingeben, verarbeiten Sie personenbezogene
+    Daten in eigener Verantwortung. Da diese Daten das Gerät nicht verlassen, findet keine
+    Übermittlung an den Anbieter statt. Bitte beachten Sie dennoch die Vorgaben Ihres Vereins
+    oder Ihrer Schule. Bei minderjährigen Spielerinnen und Spielern empfiehlt es sich,
+    nur Rückennummern, Vornamen oder Kürzel zu verwenden.
+  </p>
+  <p>
+    Beachten Sie außerdem, dass exportierte Bilder und GIF-Dateien die Beschriftungen der
+    Spielerkreise sichtbar enthalten. Wenn Sie solche Dateien weitergeben, geben Sie damit
+    auch die darin enthaltenen Namen weiter.
+  </p>
 
-<h2>4. Keine Analyse, keine Werbung, kein Tracking</h2>
-<p>
-TacticBoard enthält keine Werbung, keine Analyse- oder Tracking-Dienste und setzt
-keine Cookies zu Werbezwecken ein.
-</p>
+  <h2>5. Kader aus der Zwischenablage übernehmen</h2>
+  <p>
+    Über die Funktion „Kader einfügen“ können Sie Text aus der Zwischenablage Ihres Geräts
+    übernehmen, um Spieler automatisch auf dem Feld zu platzieren. Der Zugriff auf die
+    Zwischenablage erfolgt ausschließlich auf Ihren ausdrücklichen Tastendruck hin; je nach
+    Gerät fragt das Betriebssystem zusätzlich um Erlaubnis. Der übernommene Text wird nur
+    im Arbeitsspeicher ausgewertet und nicht übertragen. Sie können den Text alternativ
+    auch von Hand in das Eingabefeld einfügen.
+  </p>
 
-<h2>5. Löschen deiner Daten</h2>
-<p>
-Da alle Inhalte nur lokal gespeichert werden, hast du die volle Kontrolle: Du kannst
-einzelne Taktiken direkt in der App löschen oder sämtliche Daten entfernen, indem du
-die App deinstallierst bzw. in den Android-Einstellungen die App-Daten löschst.
-</p>
+  <h2>6. Berechtigungen</h2>
+  <p>
+    Die App fordert keine Berechtigungen für Kamera, Mikrofon, Kontakte, Standort oder
+    Telefonie an. Beim Export eines Bildes, einer GIF-Animation oder einer Taktik-Datei
+    wird die Datei auf Ihrem Gerät erzeugt und über die Teilen- beziehungsweise
+    Speichern-Funktion Ihres Geräts weitergegeben. Wohin die Datei anschließend gelangt,
+    entscheiden allein Sie.
+  </p>
 
-<h2>6. Google Play</h2>
-<p>
-Beim Herunterladen der App über den Google Play Store verarbeitet Google als
-eigenständiger Verantwortlicher bestimmte Daten (z.&nbsp;B. Konto- und Geräteinformationen).
-Darauf hat der Entwickler keinen Einfluss. Informationen dazu findest du in der
-<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Google</a>.
-</p>
+  <h2>7. Verbindungen ins Internet</h2>
+  <p>
+    Die App-Fassungen für Google Play und den App Store enthalten alle benötigten
+    Programmbibliotheken bereits im Installationspaket und bauen von sich aus keine
+    Netzwerkverbindungen auf.
+  </p>
+  <p>
+    Die frei zugängliche Web-Fassung unter
+    <a href="https://simaehlmann-cloud.github.io/TacticBoard/">simaehlmann-cloud.github.io/TacticBoard</a>
+    lädt die Bibliotheken für den Bild- und GIF-Export in Ausnahmefällen vom
+    Content-Delivery-Netzwerk cdnjs.cloudflare.com nach, sofern die mitgelieferten
+    Dateien nicht verfügbar sind. Dabei wird Ihre IP-Adresse technisch bedingt an
+    Cloudflare übermittelt. Betreiber ist Cloudflare, Inc., 101 Townsend St, San Francisco,
+    CA 94107, USA. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse
+    liegt in der zuverlässigen Bereitstellung der Exportfunktion. Diese Übermittlung
+    findet in den Store-Fassungen der App nicht statt.
+  </p>
 
-<h2>7. Deine Rechte</h2>
-<p>
-Dir stehen die Rechte nach der DSGVO zu (Auskunft, Berichtigung, Löschung,
-Einschränkung, Datenübertragbarkeit, Widerspruch, Beschwerde bei einer
-Aufsichtsbehörde). Da TacticBoard keine personenbezogenen Daten erhebt oder
-speichert, liegen beim Entwickler in der Regel keine Daten über dich vor. Bei Fragen
-erreichst du uns jederzeit unter der oben genannten E-Mail-Adresse.
-</p>
+  <h2>8. Bezug über einen App-Vertrieb</h2>
+  <p>
+    Beim Herunterladen und beim Kauf der App über Google Play oder den Apple App Store
+    verarbeitet dessen Betreiber eigenständig Daten (etwa Konto, Gerät, Zahlungsvorgang
+    und Zeitpunkt des Downloads). Darauf hat der Anbieter dieser App keinen Einfluss.
+    Es gelten die Datenschutzbestimmungen des jeweiligen Betreibers:
+  </p>
+  <ul>
+    <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Google</a></li>
+    <li><a href="https://www.apple.com/legal/privacy/de-ww/" target="_blank" rel="noopener">Datenschutzerklärung von Apple</a></li>
+  </ul>
 
-<h2>8. Änderungen</h2>
-<p>
-Sollte sich der Funktionsumfang der App ändern, wird diese Datenschutzerklärung
-entsprechend angepasst.
-</p>
+  <h2>9. Ihre Rechte</h2>
+  <p>
+    Ihnen stehen die Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung der
+    Verarbeitung, Datenübertragbarkeit und Widerspruch nach Art. 15 bis 21 DSGVO zu sowie
+    ein Beschwerderecht bei einer Aufsichtsbehörde. Da beim Anbieter keine personenbezogenen
+    Daten gespeichert werden, laufen Auskunfts- und Löschersuchen gegenüber dem Anbieter in
+    der Regel ins Leere. Sie können alle Daten jederzeit selbst in der App löschen.
+  </p>
 
-<hr style="border:none; border-top:1px solid rgba(255,255,255,0.15); margin:36px 0;" />
+  <h2>10. Änderungen dieser Erklärung</h2>
+  <p>
+    Diese Erklärung wird angepasst, sobald sich Funktionen der App ändern, die für den
+    Datenschutz erheblich sind. Die jeweils gültige Fassung ist in der App und auf dieser
+    Seite abrufbar.
+  </p>
 
-<h2>Privacy Policy (English summary)</h2>
-<p>
-TacticBoard does <strong>not collect, store or transmit any personal data</strong>.
-The app works completely offline. All content you create is stored locally on your
-device only and never leaves it unless you actively export or share it yourself.
-There are no ads, no analytics and no tracking. To delete all data, simply remove
-your tactics in the app or uninstall the app. Contact:
-<a href="mailto:info@taktiktafel.de">info@taktiktafel.de</a>.
-</p>
+  <h2>11. Kontakt</h2>
+  <p>
+    Bei Fragen zum Datenschutz wenden Sie sich bitte an
+    <a href="mailto:smaehlmann.appdev@gmail.com">smaehlmann.appdev@gmail.com</a>.
+  </p>
 
-<p class="muted">Stand / Last updated: Juli 2026</p>
-</div>
+  <div class="links">
+    <a href="index.html">Zurück zur App</a>
+    <a href="impressum.html">Impressum</a>
+  </div>
+</main>
 </body>
 </html>

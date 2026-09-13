@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "TacticBoard",
   "short_name": "TacticBoard",
   "description": "Digitales Taktikbrett für Trainer und Spieler – mit animierbaren Spielzügen.",
@@ -15,6 +16,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "icon_maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
