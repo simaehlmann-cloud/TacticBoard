@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Gibt genau einen Unterordner des App-Caches fuer den FileProvider frei.
-     Nur die dort abgelegten Exportdateien sind teilbar, sonst nichts. -->
-<paths>
-    <cache-path name="tb_shared" path="shared/" />
-</paths>
