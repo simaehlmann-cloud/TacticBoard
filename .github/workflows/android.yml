@@ -32,6 +32,17 @@
 # OHNE Secrets baut dieser Workflow automatisch eine Debug-APK.
 #
 # ---------------------------------------------------------------------
+# APP-ICONS
+#
+# Im Repo liegen nur drei Master:
+#   image.png     512x512  RGB   - Launcher vor Android 8, PWA, Favicon
+#   icon_fg.png  1024x1024 RGBA  - Adaptive-Vordergrund (MUSS transparent sein)
+#   icon_bg.png  1024x1024 RGB   - Adaptive-Hintergrund (Rasen)
+# Daraus erzeugt tools/make_android_icons.py alle Dichte-Varianten unter
+# res/android/; config.xml verweist darauf. Die Dichte-Dateien gehoeren
+# NICHT ins Repo.
+#
+# ---------------------------------------------------------------------
 # BIBLIOTHEKS-PRUEFSUMMEN (einmalig anlegen)
 #
 # Der Build laedt html2canvas und gif.js vom CDN. Damit dort nicht
@@ -92,11 +103,20 @@ jobs:
         cp manifest.json taktik_build/www/manifest.json
         cp sw.js taktik_build/www/sw.js
         cp image.png taktik_build/www/image.png
-        cp config.xml taktik_build/config.xml
-        cp image.png taktik_build/image.png
-        cp icon_fg.png taktik_build/icon_fg.png
-        cp colors.xml taktik_build/colors.xml
+        cp icon_maskable.png taktik_build/www/icon_maskable.png
         cp datenschutz.html taktik_build/www/datenschutz.html
+        cp impressum.html taktik_build/www/impressum.html
+        cp config.xml taktik_build/config.xml
+
+    - name: App-Icons erzeugen
+      run: |
+        set -euo pipefail
+        pip install --quiet --disable-pip-version-check pillow
+        # Erzeugt res/android/ aus image.png, icon_fg.png und icon_bg.png.
+        # Bricht ab, wenn ein Master kein echtes PNG ist oder dem
+        # Adaptive-Vordergrund der Alphakanal fehlt.
+        python3 tools/make_android_icons.py
+        cp -r res taktik_build/res
 
     - name: Export-Bibliotheken laden
       run: |
@@ -139,13 +159,22 @@ jobs:
         cordova platform ls
         java -version
 
-    - name: Copy App Icons
+    - name: Icon-Ergebnis pruefen
       run: |
-        cd taktik_build
+        set -euo pipefail
+        cd taktik_build/platforms/android/app/src/main/res
+        echo "--- erzeugte Adaptive-Icon-Definitionen ---"
         for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-          cp image.png platforms/android/app/src/main/res/mipmap-$d/ic_launcher.png || true
-          cp image.png platforms/android/app/src/main/res/mipmap-$d/ic_launcher_foreground.png || true
+          f="mipmap-$d-v26/ic_launcher.xml"
+          [ -f "$f" ] || { echo "::error::$f fehlt - Adaptive Icon wurde nicht erzeugt."; exit 1; }
+          echo "$f:"; sed -n '2,6p' "$f"
         done
+        for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+          for n in ic_launcher ic_launcher_foreground ic_launcher_background; do
+            [ -f "mipmap-$d/$n.png" ] || { echo "::error::mipmap-$d/$n.png fehlt."; exit 1; }
+          done
+        done
+        echo "Alle Launcher-Icons vorhanden."
 
     # ---------- DEBUG-BUILD (laeuft, solange keine Secrets angelegt sind) ----------
 
