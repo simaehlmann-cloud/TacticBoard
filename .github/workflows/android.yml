@@ -159,6 +159,22 @@ jobs:
         cordova platform ls
         java -version
 
+    - name: Teilen-Plugin einbinden
+      run: |
+        set -euo pipefail
+        # NICHT nach taktik_build/plugins kopieren - dort verwaltet Cordova
+        # seine eigenen installierten Plugins.
+        cp -r plugins taktik_build/plugins-src
+        cd taktik_build
+        cordova plugin add ./plugins-src/cordova-plugin-tb-share --no-telemetry
+        echo "--- installierte Plugins ---"
+        cordova plugin ls
+        test -f platforms/android/app/src/main/java/de/tacticboard/share/TbShare.java \
+          || { echo "::error::TbShare.java wurde nicht in das Android-Projekt uebernommen."; exit 1; }
+        grep -q 'tbshare' platforms/android/app/src/main/AndroidManifest.xml \
+          || { echo "::error::FileProvider fehlt im AndroidManifest."; exit 1; }
+        echo "Teilen-Plugin eingebunden."
+
     - name: Icon-Ergebnis pruefen
       run: |
         set -euo pipefail
