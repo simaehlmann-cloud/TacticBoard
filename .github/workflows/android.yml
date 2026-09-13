@@ -163,17 +163,29 @@ jobs:
       run: |
         set -euo pipefail
         cd taktik_build/platforms/android/app/src/main/res
-        echo "--- erzeugte Adaptive-Icon-Definitionen ---"
+        # Cordova legt die beiden Adaptive-Ebenen und die ic_launcher.xml in
+        # mipmap-<dichte>-v26/ ab, das klassische Icon dagegen in mipmap-<dichte>/.
+        # (getAdaptiveImageResourcePath bzw. getImageResourcePath in cordova-android)
+        fehler=0
         for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-          f="mipmap-$d-v26/ic_launcher.xml"
-          [ -f "$f" ] || { echo "::error::$f fehlt - Adaptive Icon wurde nicht erzeugt."; exit 1; }
-          echo "$f:"; sed -n '2,6p' "$f"
-        done
-        for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-          for n in ic_launcher ic_launcher_foreground ic_launcher_background; do
-            [ -f "mipmap-$d/$n.png" ] || { echo "::error::mipmap-$d/$n.png fehlt."; exit 1; }
+          echo "--- $d ---"
+          for f in "mipmap-$d-v26/ic_launcher.xml" \
+                   "mipmap-$d-v26/ic_launcher_foreground.png" \
+                   "mipmap-$d-v26/ic_launcher_background.png" \
+                   "mipmap-$d/ic_launcher.png"; do
+            if [ -f "$f" ]; then
+              echo "  ok    $f"
+            else
+              echo "::error::$f fehlt."
+              fehler=1
+            fi
           done
         done
+        echo ""
+        echo "--- Inhalt von mipmap-xxxhdpi-v26/ic_launcher.xml ---"
+        cat mipmap-xxxhdpi-v26/ic_launcher.xml 2>/dev/null || true
+        echo ""
+        [ "$fehler" -eq 0 ] || { echo "::error::Launcher-Icons unvollstaendig."; exit 1; }
         echo "Alle Launcher-Icons vorhanden."
 
     # ---------- DEBUG-BUILD (laeuft, solange keine Secrets angelegt sind) ----------
