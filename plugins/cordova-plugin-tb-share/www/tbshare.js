@@ -13,5 +13,14 @@ module.exports = {
         return new Promise(function (resolve, reject) {
             exec(resolve, reject, 'TbShare', 'shareFile', [dateiname, mimeTyp, base64]);
         });
+    },
+
+    /** Legt das Bild direkt in der Galerie ab (Bilder/TacticBoard).
+     *  Vor Android 10 faellt das Plugin auf das Teilen-Menue zurueck.
+     *  Loest mit dem Ordnernamen auf, oder mit '' wenn geteilt wurde. */
+    saveImage: function (dateiname, mimeTyp, base64) {
+        return new Promise(function (resolve, reject) {
+            exec(resolve, reject, 'TbShare', 'saveImage', [dateiname, mimeTyp, base64]);
+        });
     }
 };
