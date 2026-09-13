@@ -30,6 +30,8 @@
     --draw-color-2:#0077cc;
     /* Wird von fitFieldToScreen() zur Laufzeit auf die Geraetegroesse gesetzt */
     --field-max-w: 900px;
+    /* Groessenregler, 0.5 bis 1.0 - wirkt auf die Breite, nicht als transform */
+    --field-zoom: 1;
 }
 
 html, body {
@@ -75,13 +77,30 @@ html, body {
 
 /* FIELD WRAPPER */
 #zoom-wrapper {
-    width:100%; display:flex; justify-content:center; align-items:flex-start; transform-origin:center top;
-    margin:16px auto; transition: transform 0.1s ease-out;
+    width:100%; display:flex; justify-content:center; align-items:flex-start; position:relative;
+    margin:16px auto; transition: max-width 0.1s ease-out;
     /* Die maximale Breite wird in JS aus der echten Fenstergroesse berechnet
        (fitFieldToScreen). Fruehere feste Formel "100vh - 300px" ergab im
        Querformat ein winziges Feld. */
-    max-width: var(--field-max-w);
+    max-width: calc(var(--field-max-w) * var(--field-zoom));
 }
+
+/* VOLLBILD: Kopfzeile und Nr/Name-Zeile weichen, damit im Querformat das Feld
+   den Platz bekommt. Bewusst ein Knopf und kein automatisches Ausblenden -
+   Tippen auf dem Feld ist bereits mit Auswaehlen und Ziehen belegt. */
+#fullscreen-btn {
+    position:absolute; right:8px; top:8px; z-index:30;
+    width:42px; height:42px; padding:0; min-width:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; line-height:1; border-radius:10px;
+    background:rgba(0,0,0,0.55); color:#fff;
+    border:1px solid rgba(255,255,255,0.35);
+    box-shadow:0 2px 6px rgba(0,0,0,0.4);
+}
+body.fullscreen-board .header,
+body.fullscreen-board #setup-controls { display:none; }
+body.fullscreen-board .container { padding-top:8px; }
+body.fullscreen-board #zoom-wrapper { margin-top:0; }
 
 /* FIELD */
 #football-field {
@@ -282,12 +301,13 @@ body.landscape-fit .dev-credits { font-size:11px; }
 
 <div class="container">
     <div id="setup-controls">
-        <input id="name-input" class="grow" type="text" placeholder="Nr/Name" />
+        <input id="name-input" class="grow" type="text" placeholder="Nr/Name" maxlength="14" />
         <button id="action-btn" title="Spieler">🔴</button>
         <button id="enemy-btn" title="Gegner">🔵</button>
     </div>
 
     <div id="zoom-wrapper">
+        <button id="fullscreen-btn" title="Vollbild">⛶</button>
         <div id="football-field">
             <canvas id="drawing-canvas"></canvas>
         </div>
@@ -300,6 +320,7 @@ body.landscape-fit .dev-credits { font-size:11px; }
             <button id="cone-btn" title="Hütchen">▲</button>
             <button id="add-arrow-btn">➦ Pfeil</button>
             <button id="delete-btn">🗑️ Objekt löschen</button>
+            <button id="undo-draw-btn">↩️ Rückgängig</button>
         </div>
 
         <div class="row" id="arrow-anim-controls" style="display:none;">
@@ -326,7 +347,6 @@ body.landscape-fit .dev-credits { font-size:11px; }
             <div id="color1-btn"></div>
             <div id="color2-btn"></div>
             <button id="line-style-btn">▬ Durchgehend</button>
-            <button id="undo-draw-btn">↩️ Rückgängig</button>
             <button id="clear-all-btn">🔄 Alles löschen</button>
         </div>
 
@@ -348,7 +368,7 @@ body.landscape-fit .dev-credits { font-size:11px; }
         </div>
 
         <div class="row">
-            <input id="tactic-name-input" class="grow" type="text" placeholder="Taktikname..." />
+            <input id="tactic-name-input" class="grow" type="text" placeholder="Taktikname..." maxlength="40" />
             <select id="tactic-select" class="grow"></select>
         </div>
 
@@ -490,6 +510,7 @@ const clearAllBtn = document.getElementById('clear-all-btn');
 
 const sizeSlider = document.getElementById('size-slider');
 const zoomWrapper = document.getElementById('zoom-wrapper');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
 
 const tacticNameInput = document.getElementById('tactic-name-input');
 const tacticSelect = document.getElementById('tactic-select');
@@ -972,8 +993,10 @@ function setupItemResize(el) {
         const startW = parseFloat(el.style.width) || (el.clientWidth / field.clientWidth * 100); const startH = parseFloat(el.style.height) || (el.clientHeight / field.clientHeight * 100);
         function moveResize(ev) {
             const curX = ev.touches ? ev.touches[0].clientX : ev.clientX; const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-            const scale = parseInt(sizeSlider.value, 10) / 100;
-            const dX = (curX - startX) / scale; const dY = (curY - startY) / scale;
+            /* Der Groessenregler aendert jetzt die echte Layout-Breite statt zu
+               transformieren. field.clientWidth enthaelt die Skalierung damit
+               bereits - ein zusaetzliches Herausrechnen waere doppelt. */
+            const dX = curX - startX; const dY = curY - startY;
             // Bei gedrehten Objekten die Bewegung in das lokale Koordinatensystem umrechnen
             const rot = parseFloat(el.dataset.rotation || '0') * Math.PI / 180;
             const ldX = dX * Math.cos(rot) + dY * Math.sin(rot);
@@ -1159,9 +1182,8 @@ function setupPercentDrag(el, size) {
         sL = parseFloat(el.style.left) || 0; sT = parseFloat(el.style.top) || 0;
         function moveDrag(ev) {
             const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-            const scale = parseInt(sizeSlider.value, 10) / 100;
-            let fL = sL + ((cX - sX) / scale / field.clientWidth) * 100;
-            let fT = sT + ((cY - sY) / scale / field.clientHeight) * 100;
+            let fL = sL + ((cX - sX) / field.clientWidth) * 100;
+            let fT = sT + ((cY - sY) / field.clientHeight) * 100;
             const max = 100 - size;
             if (fL < 0) fL = 0; if (fT < 0) fT = 0; if (fL > max) fL = max; if (fT > max) fT = max;
             el.style.left = fL + '%'; el.style.top = fT + '%';
@@ -1326,11 +1348,10 @@ function startPointDragAt(arrow, idx, e){
     docDrag(function(ev){
         if(ev.cancelable) ev.preventDefault();
         const cX = ev.touches ? ev.touches[0].clientX : ev.clientX, cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-        const scale = parseInt(sizeSlider.value, 10) / 100;
         const pts = startPts.map(p => ({ x: p.x, y: p.y }));
         pts[idx] = {
-            x: Math.min(field.clientWidth, Math.max(0, startPts[idx].x + (cX - sX) / scale)),
-            y: Math.min(field.clientHeight, Math.max(0, startPts[idx].y + (cY - sY) / scale))
+            x: Math.min(field.clientWidth, Math.max(0, startPts[idx].x + (cX - sX))),
+            y: Math.min(field.clientHeight, Math.max(0, startPts[idx].y + (cY - sY)))
         };
         setArrowPercentPoints(arrow, pts);
         applyArrowVisual(arrow);
@@ -1357,9 +1378,8 @@ function wireArrowBase(arrow){
         docDrag(function(ev){
             if(ev.cancelable) ev.preventDefault();
             const cX = ev.touches ? ev.touches[0].clientX : ev.clientX, cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-            const scale = parseInt(sizeSlider.value, 10) / 100;
             // Verschiebung so begrenzen, dass der ganze Pfeil im Spielfeld bleibt
-            let dx = (cX - sX) / scale, dy = (cY - sY) / scale;
+            let dx = cX - sX, dy = cY - sY;
             dx = Math.max(-minX, Math.min(fw - maxX, dx));
             dy = Math.max(-minY, Math.min(fh - maxY, dy));
             setArrowPercentPoints(arrow, startPts.map(p => ({ x: p.x + dx, y: p.y + dy })));
@@ -1417,7 +1437,22 @@ function legacyArrowPoints(a){
 --------------------------------------------------- */
 deleteBtn.addEventListener('click', () => {
     if(activeArrow){ pushDeleteHistory(activeArrow); activeArrow.remove(); activeArrow = null; }
-    else if(activePlayer){ pushDeleteHistory(activePlayer); activePlayer.remove(); activePlayer = null; }
+    else if(activePlayer){
+        /* Pfeile, die auf dieses Objekt zeigen, muessen mit weg. Sonst bleiben
+           sie als Geister stehen: sichtbar, aber animateArrow findet das Ziel
+           nicht mehr und der Schritt laeuft wortlos ins Leere. Sie kommen
+           zuerst in den Verlauf, damit ein Rueckgaengig zuerst das Objekt und
+           danach die Pfeile wiederherstellt. */
+        const oid = activePlayer.dataset.oid;
+        const verwaist = oid
+            ? Array.from(field.querySelectorAll('.arrow-container'))
+                   .filter(a => a.dataset.targetOid === oid)
+            : [];
+        verwaist.forEach(a => { pushDeleteHistory(a); a.remove(); });
+        pushDeleteHistory(activePlayer);
+        activePlayer.remove(); activePlayer = null;
+        if(verwaist.length) showToast(translations[LANG].msgArrowsRemoved(verwaist.length));
+    }
     updateButtonVisibility();
 });
 function selectPlayer(p){
@@ -1471,7 +1506,8 @@ stepMinusBtn.addEventListener('click', () => {
 stepPlusBtn.addEventListener('click', () => {
     if(!activeArrow) return;
     let s = parseInt(activeArrow.dataset.step || '1', 10);
-    if(s < 20) s++;
+    if(s >= 20){ showToast(translations[LANG].msgMaxSteps); return; }
+    s++;
     activeArrow.dataset.step = s; stepDisplay.textContent = s; applyArrowVisual(activeArrow);
 });
 withBallBtn.addEventListener('click', () => {
@@ -1798,8 +1834,8 @@ exportGifBtn.addEventListener('click', async () => {
     drawFieldFrame(g, W, H, assets);
     gif.addFrame(frameCanvas, { copy: true, delay: 900 }); // Endbild etwas stehen lassen
     gif.on('finished', blob => {
-        dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Animation'), '.gif'), 'image/gif')
-            .then(() => showToast(translations[LANG].msgGifDone))
+        dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Animation'), '.gif'), 'image/gif', true)
+            .then(wohin => showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgGifDone))
             .catch(err => { console.error('GIF-Export:', err); showToast(translations[LANG].msgShareError); })
             .finally(() => { exportGifBtn.disabled = false; });
     });
@@ -1901,6 +1937,11 @@ const translations = {
         msgAnimError: 'Animation abgebrochen (fehlerhafte Daten?).',
         importSquadBtn: '📋 Kader einfügen',
         confirmDeleteTactic: 'Diese Taktik wirklich löschen?',
+        confirmSwitchSport: 'Sportart wechseln? Das Feld wird dabei geleert.',
+        msgArrowsRemoved: n => n === 1 ? 'Objekt und 1 zugehöriger Pfeil gelöscht.' : 'Objekt und ' + n + ' zugehörige Pfeile gelöscht.',
+        msgMaxSteps: 'Mehr als 20 Schritte sind nicht möglich.',
+        importHome: 'gegen',
+        importAway: 'bei',
         msgUpdated: 'Taktik aktualisiert.',
         msgBackAgainToExit: 'Zum Beenden erneut auf Zurück tippen.',
         titlePlayer: 'Spieler',
@@ -1923,6 +1964,10 @@ const translations = {
         msgExportUnavailable: 'Export nicht verfügbar (Internetverbindung erforderlich).',
         msgExportError: 'Fehler beim Export.',
         msgShareError: 'Datei konnte nicht weitergegeben werden.',
+        fullscreenOn: 'Vollbild',
+        fullscreenOff: 'Vollbild beenden',
+        msgSavedToGallery: 'In der Galerie gespeichert (Bilder/TacticBoard).',
+        msgImageSaved: 'Bild erstellt.',
         exportBtn: '📤 Export',
         importBtn: '📥 Import',
         msgNoTactics: 'Keine gespeicherten Taktiken vorhanden.',
@@ -2004,6 +2049,11 @@ const translations = {
         msgAnimError: 'Animation aborted (invalid data?).',
         importSquadBtn: '📋 Import squad',
         confirmDeleteTactic: 'Really delete this tactic?',
+        confirmSwitchSport: 'Switch sport? This clears the field.',
+        msgArrowsRemoved: n => n === 1 ? 'Object and 1 attached arrow deleted.' : 'Object and ' + n + ' attached arrows deleted.',
+        msgMaxSteps: 'More than 20 steps are not possible.',
+        importHome: 'vs',
+        importAway: 'at',
         msgUpdated: 'Tactic updated.',
         msgBackAgainToExit: 'Press back again to exit.',
         titlePlayer: 'Player',
@@ -2026,6 +2076,10 @@ const translations = {
         msgExportUnavailable: 'Export unavailable (internet connection required).',
         msgExportError: 'Error during export.',
         msgShareError: 'The file could not be shared.',
+        fullscreenOn: 'Full screen',
+        fullscreenOff: 'Exit full screen',
+        msgSavedToGallery: 'Saved to your gallery (Pictures/TacticBoard).',
+        msgImageSaved: 'Image created.',
         exportBtn: '📤 Export',
         importBtn: '📥 Import',
         msgNoTactics: 'No saved tactics yet.',
@@ -2107,6 +2161,7 @@ function applyLanguage(lang){
     const aboutTitleEl = document.querySelector('#about-modal .modal-title');
     if(aboutTitleEl) aboutTitleEl.textContent = t.aboutTitle;
     aboutTextEl.innerHTML = t.aboutText;
+    fullscreenBtn.title = t[document.body.classList.contains('fullscreen-board') ? 'fullscreenOff' : 'fullscreenOn'];
     closeAboutBtn.textContent = t.closeBtn;
     stepLabelText.textContent = t.stepLabel;
     withBallBtn.innerHTML = t.withBallBtn;
@@ -2156,18 +2211,31 @@ document.addEventListener('click', (e) => {
     }
 });
 
+/* Der Sportwechsel raeumt das Feld genauso leer wie "Alles loeschen" und
+   loescht zusaetzlich den Verlauf - rueckgaengig machen geht danach nicht
+   mehr. "Alles loeschen" fragt vorher nach, das hier muss es auch. */
+function brettIstLeer(){
+    return field.querySelectorAll('.player,.arrow-container').length === 0
+        && drawingStrokes.length === 0 && !legacyBackgroundImage;
+}
+function sportWechseln(sport){
+    currentSport = sport;
+    field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove());
+    clearCanvasAll();
+    clearHistory(); clearAnimBaseline();
+    redCounter = 0; enemyCounter = 0;
+    activePlayer = null; activeArrow = null; updateButtonVisibility();
+    renderFieldSVG(currentSport);
+    updateContextButtons();
+    showToast(translations[LANG].msgFieldLoaded(translations[LANG].sportNames[currentSport]));
+}
 document.querySelectorAll('.sport-btn-left').forEach(btn => {
     btn.addEventListener('click', () => {
-        currentSport = btn.dataset.sport;
-        field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove());
-        clearCanvasAll();
-        clearHistory(); clearAnimBaseline();
-        redCounter = 0; enemyCounter = 0;
-        activePlayer = null; activeArrow = null; updateButtonVisibility();
-        renderFieldSVG(currentSport);
-        updateContextButtons();
+        const sport = btn.dataset.sport;
         sportPickerMenu.style.display = 'none';
-        showToast(translations[LANG].msgFieldLoaded(translations[LANG].sportNames[currentSport]));
+        if(sport === currentSport) return;
+        if(brettIstLeer()) sportWechseln(sport);
+        else askConfirm('confirmSwitchSport', () => sportWechseln(sport));
     });
 });
 /* Ein Dialog fuer alle Rueckfragen: Titel und Aktion werden gesetzt,
@@ -2200,10 +2268,30 @@ closeAboutBtn.addEventListener('click', () => aboutModal.style.display = 'none')
    dann nicht mehr erreichbar. Die Einstellung wird gemerkt, damit sie nach
    einem versehentlichen Wischen nicht ueberrascht. */
 const ZOOM_KEY = 'tacticboard_zoom';
+/* Vollbild: Kopfzeile und Nr/Name-Zeile ausblenden. Beide sind danach
+   display:none, ihr offsetHeight ist 0 - fitFieldToScreen rechnet also von
+   selbst mit dem gewonnenen Platz, ohne Sonderfall. */
+function setFullscreenBoard(an){
+    document.body.classList.toggle('fullscreen-board', an);
+    fullscreenBtn.textContent = an ? '✕' : '⛶';
+    fullscreenBtn.title = translations[LANG][an ? 'fullscreenOff' : 'fullscreenOn'];
+    fitFieldToScreen();
+}
+fullscreenBtn.addEventListener('click', () => {
+    setFullscreenBoard(!document.body.classList.contains('fullscreen-board'));
+});
+
+/* Frueher lief der Regler ueber transform:scale(). Eine Transformation aendert
+   aber das Layout nicht - das Feld belegte weiter seine volle Hoehe, und ein
+   nachgeschobener negativer margin-bottom sollte den Leerraum einsammeln. Im
+   Querformat ist der Container ein Flex-Container mit order:-1 auf dem Feld;
+   dort ging diese Rechnung schief und das Board rutschte aus dem Bild.
+   Jetzt wird schlicht die Breite gesetzt - echtes Layout, kein Leerraum. */
 function applyZoom(percent, save){
     const val = Math.max(50, Math.min(100, parseInt(percent, 10) || 100)) / 100;
-    zoomWrapper.style.transform = val === 1 ? '' : 'scale(' + val + ')';
-    zoomWrapper.style.marginBottom = val === 1 ? '' : ((val - 1) * zoomWrapper.offsetHeight) + 'px';
+    document.documentElement.style.setProperty('--field-zoom', String(val));
+    zoomWrapper.style.transform = '';
+    zoomWrapper.style.marginBottom = '';
     if(save){ try{ localStorage.setItem(ZOOM_KEY, String(Math.round(val * 100))); }catch(e){} }
 }
 sizeSlider.addEventListener('input', () => applyZoom(sizeSlider.value, true));
@@ -2228,13 +2316,20 @@ function refreshTacticSelect(){
     const list = getTactics(); tacticSelect.innerHTML = '<option value="">'+translations[LANG].tacticSelectDefault+'</option>';
     list.forEach(t => { const opt = document.createElement('option'); opt.value = t.id; opt.textContent = t.name; tacticSelect.appendChild(opt); });
 }
-saveBtn.addEventListener('click', () => {
-    const name = tacticNameInput.value.trim();
-    if(!name) { showToast(translations[LANG].msgEnterName); return; }
+/* Liest den aktuellen Brettzustand. Wird vom Speichern-Knopf und vom
+   automatischen Sichern benutzt - eine Quelle, damit beide nie auseinanderlaufen. */
+function brettLesen(){
     const players = [];
     field.querySelectorAll('.player').forEach(p => players.push({ className: p.className, text: p.dataset.text || p.innerText, left: p.style.left, top: p.style.top, width: p.style.width, height: p.style.height, color: p.dataset.color || p.style.color, oid: p.dataset.oid, variant: p.dataset.variant || '', rotation: p.dataset.rotation || '' }));
     const arrows = [];
     field.querySelectorAll('.arrow-container').forEach(a => arrows.push({ points: JSON.parse(a.dataset.points || '[]'), color: a.dataset.color || '', dashed: a.dataset.dashed || 'false', targetOid: a.dataset.targetOid || '', step: a.dataset.step || '1', withBall: a.dataset.withBall || 'false', pace: a.dataset.pace || 'normal' }));
+    return { sport: currentSport, players, arrows, drawing: drawingStrokes };
+}
+
+saveBtn.addEventListener('click', () => {
+    const name = tacticNameInput.value.trim();
+    if(!name) { showToast(translations[LANG].msgEnterName); return; }
+    const { players, arrows } = brettLesen();
     
     const list = getTactics();
     // Gleicher Name = dieselbe Taktik aktualisieren, statt einen zweiten
@@ -2250,6 +2345,13 @@ saveBtn.addEventListener('click', () => {
 function loadTactic(id){
     const t = getTactics().find(x => x.id === id);
     if(!t){ showToast(translations[LANG].msgSelectTactic); return; }
+    brettAnwenden(t);
+    showToast(translations[LANG].msgTacticLoaded(t.name));
+}
+
+/* Baut einen gespeicherten Zustand auf dem Feld auf. Ohne Meldung, damit
+   das stille Wiederherstellen beim Start keinen Hinweis ausloest. */
+function brettAnwenden(t){
     currentSport = t.sport || 'football'; renderFieldSVG(currentSport); updateContextButtons();
     field.querySelectorAll('.player,.arrow-container').forEach(el => el.remove()); clearCanvasAll();
     clearHistory(); clearAnimBaseline();
@@ -2273,7 +2375,6 @@ function loadTactic(id){
         drawingStrokes = t.drawing || [];
         redrawCanvas();
     }
-    showToast(translations[LANG].msgTacticLoaded(t.name));
 }
 // Auswahl im Dropdown laedt direkt, der Laden-Button laedt die aktuelle Auswahl
 // erneut (wichtig, weil ein erneutes Waehlen des gleichen Eintrags kein
@@ -2323,6 +2424,9 @@ function closeTopmostLayer(){
 
     // 5. Auswahl aufheben
     if(activePlayer || activeArrow){ selectPlayer(null); selectArrow(null); return true; }
+
+    // 6. Vollbild verlassen, bevor die App beendet wird
+    if(document.body.classList.contains('fullscreen-board')){ setFullscreenBoard(false); return true; }
 
     return false;
 }
@@ -2446,7 +2550,9 @@ function renderImportPreview(){
         const head = document.createElement('div');
         const strong = document.createElement('b');
         strong.textContent = b.team;
-        const opp = b.opponent ? (b.home === false ? ' bei ' : ' gegen ') + b.opponent : '';
+        const opp = b.opponent
+            ? ' ' + translations[LANG][b.home === false ? 'importAway' : 'importHome'] + ' ' + b.opponent
+            : '';
         head.appendChild(strong);
         head.appendChild(document.createTextNode(
             ' \u00b7 ' + b.date + opp +
@@ -2603,10 +2709,17 @@ function blobZuBase64(blob){
     });
 }
 
-async function dateiSichern(blob, name, mimeTyp){
+async function dateiSichern(blob, name, mimeTyp, inGalerie){
     if(window.TbShare && window.TbShare.shareFile){
-        await window.TbShare.shareFile(name, mimeTyp, await blobZuBase64(blob));
-        return;
+        const b64 = await blobZuBase64(blob);
+        // Bilder und GIFs gehoeren in die Galerie - "Als Bild speichern" soll
+        // speichern, nicht ein Teilen-Menue oeffnen. Vor Android 10 faellt das
+        // Plugin selbst auf das Teilen-Menue zurueck und liefert ''.
+        if(inGalerie && window.TbShare.saveImage){
+            return await window.TbShare.saveImage(name, mimeTyp, b64) ? 'galerie' : '';
+        }
+        await window.TbShare.shareFile(name, mimeTyp, b64);
+        return '';
     }
     if(IST_IOS && navigator.canShare){
         try {
@@ -2673,8 +2786,13 @@ function cleanColor(raw){
 }
 function cleanText(raw){ return String(raw == null ? '' : raw).slice(0, 40); }
 
-function sanitizeTactic(t){
-    if(!t || typeof t !== 'object' || !t.name || !Array.isArray(t.players)) return null;
+/* erlaubeLeer=true nur fuer den automatisch gesicherten Arbeitsstand: der hat
+   keinen Namen und darf auch nur aus Zeichnungen bestehen. Fuer importierte
+   Dateien bleiben beide Bedingungen streng - dort sind sie der Schutz gegen
+   Muell von aussen. */
+function sanitizeTactic(t, erlaubeLeer){
+    if(!t || typeof t !== 'object' || !Array.isArray(t.players)) return null;
+    if(!erlaubeLeer && !t.name) return null;
     const players = t.players.slice(0, 60).map(p => {
         if(!p || typeof p !== 'object') return null;
         return {
@@ -2689,7 +2807,7 @@ function sanitizeTactic(t){
             rotation: isFinite(parseFloat(p.rotation)) ? String(parseFloat(p.rotation) % 360) : ''
         };
     }).filter(Boolean);
-    if(players.length === 0) return null;
+    if(players.length === 0 && !erlaubeLeer) return null;
 
     const arrows = (Array.isArray(t.arrows) ? t.arrows : []).slice(0, 60).map(a => {
         if(!a || typeof a !== 'object') return null;
@@ -2779,13 +2897,56 @@ exportImgBtn.addEventListener('click', () => {
                 canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob lieferte null')), 'image/png');
             });
         }).then(blob => {
-            return dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Board'), '.png'), 'image/png');
+            return dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Board'), '.png'), 'image/png', true);
+        }).then(wohin => {
+            showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgImageSaved);
         }).catch(err => {
             console.error("Export Fehler: ", err);
             showToast(translations[LANG].msgExportError);
         });
     }, 150);
 });
+
+/* ---------------------------------------------------
+   ARBEITSSTAND AUTOMATISCH SICHERN
+
+   Bisher ging alles verloren, sobald Android die App im Hintergrund
+   entlud - nur ausdruecklich gespeicherte Taktiken ueberlebten. Der
+   Arbeitsstand wird jetzt beim Wegschalten weggeschrieben und beim
+   naechsten Start stillschweigend wiederhergestellt.
+--------------------------------------------------- */
+const AUTOSAVE_KEY = 'tacticboard_autosave';
+
+function arbeitsstandSichern(){
+    try {
+        if(isAnimating) return;          // waehrend der Animation stehen Objekte auf Zwischenpositionen
+        if(brettIstLeer()){ localStorage.removeItem(AUTOSAVE_KEY); return; }
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(brettLesen()));
+    } catch(e){ /* Speicher voll oder gesperrt - kein Grund, die App zu stoeren */ }
+}
+
+function arbeitsstandWiederherstellen(){
+    let roh = null;
+    try { roh = localStorage.getItem(AUTOSAVE_KEY); } catch(e){ return; }
+    if(!roh) return;
+    try {
+        const t = sanitizeTactic(JSON.parse(roh), true);
+        if(!t) return;
+        if(!t.players.length && !t.arrows.length && !(t.drawing || []).length) return;
+        brettAnwenden(t);
+    } catch(e){
+        try { localStorage.removeItem(AUTOSAVE_KEY); } catch(e2){}
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'hidden') arbeitsstandSichern();
+});
+window.addEventListener('pagehide', arbeitsstandSichern);
+document.addEventListener('deviceready', () => {
+    // Cordova meldet das Wegschalten zuverlaessiger als visibilitychange
+    document.addEventListener('pause', arbeitsstandSichern, false);
+}, false);
 
 /* ---------------------------------------------------
    INIT
@@ -2795,12 +2956,16 @@ populateEquipMenus();
 // Startsprache: zuletzt gewaehlte Sprache, sonst Geraetesprache (Deutsch als Standard)
 let startLang = 'de';
 try {
-    const saved = localStorage.getItem('tb_lang');
+    let saved = null;
+    try { saved = localStorage.getItem('tb_lang'); } catch(e){}
     if(saved === 'de' || saved === 'en') startLang = saved;
     else if(!(navigator.language || '').toLowerCase().startsWith('de')) startLang = 'en';
 } catch(e){}
 applyLanguage(startLang);
 refreshTacticSelect();
+// Erst nach applyLanguage: brettAnwenden setzt Beschriftungen, die sonst
+// von der Sprachumschaltung wieder ueberschrieben wuerden.
+arbeitsstandWiederherstellen();
 updateButtonVisibility();
 updateToolSliders();
 updateUndoState();
@@ -2816,7 +2981,9 @@ document.getElementById('show-onboarding-btn').addEventListener('click', () => {
     onboardingModal.style.display = 'flex';
 });
 try {
-    if(!localStorage.getItem('tb_onboarding_done')) onboardingModal.style.display = 'flex';
+    let obDone = null;
+    try { obDone = localStorage.getItem('tb_onboarding_done'); } catch(e){}
+    if(!obDone) onboardingModal.style.display = 'flex';
 } catch(e){}
 
 /* Service Worker registrieren - macht die App ueber GitHub Pages offline-faehig
