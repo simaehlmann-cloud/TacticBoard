@@ -220,12 +220,27 @@ jobs:
           exit 1
         fi
 
+    - name: Build-Ergebnisse auflisten
+      if: always()
+      run: |
+        echo "HAS_KEYSTORE = ${HAS_KEYSTORE:-<leer>}"
+        d=taktik_build/platforms/android/app/build/outputs
+        if [ -d "$d" ]; then
+          echo "--- gefundene Pakete ---"
+          find "$d" -type f \( -name '*.apk' -o -name '*.aab' \) -printf '%10s  %p\n' | sort -k2
+        else
+          echo "::warning::$d existiert nicht - es wurde gar nichts gebaut."
+        fi
+
     - name: Upload Debug APK
       if: env.HAS_KEYSTORE != 'true'
       uses: actions/upload-artifact@v4
       with:
         name: TacticBoard-Debug-APK
-        path: taktik_build/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+        path: taktik_build/platforms/android/app/build/outputs/apk/debug/*.apk
+        # Fehlt die Datei, soll der Build rot werden. Vorher gab es nur eine
+        # Warnung - der Lauf war gruen, obwohl nichts herauskam.
+        if-no-files-found: error
 
     # ---------- RELEASE-BUILD (laeuft automatisch, sobald die 4 Secrets angelegt sind) ----------
 
@@ -295,11 +310,17 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: TacticBoard-PlayStore-AAB
-        path: taktik_build/platforms/android/app/build/outputs/bundle/release/app-release.aab
+        path: taktik_build/platforms/android/app/build/outputs/bundle/release/*.aab
+        # Fehlt die Datei, soll der Build rot werden. Vorher gab es nur eine
+        # Warnung - der Lauf war gruen, obwohl nichts herauskam.
+        if-no-files-found: error
 
     - name: Upload Release APK (Direct Testing)
       if: env.HAS_KEYSTORE == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: TacticBoard-Release-APK
-        path: taktik_build/platforms/android/app/build/outputs/apk/release/app-release.apk
+        path: taktik_build/platforms/android/app/build/outputs/apk/release/*.apk
+        # Fehlt die Datei, soll der Build rot werden. Vorher gab es nur eine
+        # Warnung - der Lauf war gruen, obwohl nichts herauskam.
+        if-no-files-found: error
