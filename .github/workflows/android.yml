@@ -209,13 +209,23 @@ jobs:
     - name: Build Debug APK (ohne Keystore)
       if: env.HAS_KEYSTORE != 'true'
       run: |
+        # pipefail ist entscheidend: ohne das liefert die Pipe den Exit-Code von
+        # tee (immer 0), und ein gescheiterter Gradle-Lauf wuerde als Erfolg
+        # durchgehen. Genau das ist hier passiert.
+        set -o pipefail
         echo "Keine Keystore-Secrets gefunden - baue Debug-APK zum Testen."
         cd taktik_build
-        cordova build android --device --no-telemetry 2>&1 | tee build_log.txt
-        if ! grep -q "BUILD SUCCESSFUL" build_log.txt; then
+        ergebnis=0
+        cordova build android --device --no-telemetry 2>&1 | tee build_log.txt || ergebnis=$?
+        # Zusaetzlich auf BUILD FAILED pruefen: "BUILD SUCCESSFUL" kann von einem
+        # Teilprojekt stammen, waehrend der Gesamtlauf scheitert.
+        if [ "$ergebnis" -ne 0 ] || grep -q "BUILD FAILED" build_log.txt; then
           echo ""
           echo "================= FEHLER-DIAGNOSE ================="
-          grep -n -i -B 2 -A 6 "error\|FAILURE\|Exception" build_log.txt | head -n 80 || true
+          # Gradles eigener Fehlerblock ist am aussagekraeftigsten
+          sed -n '/FAILURE: Build/,/^BUILD FAILED/p' build_log.txt | head -n 60 || true
+          echo "--- weitere Fundstellen ---"
+          grep -n -i -B 2 -A 6 "error:\|Exception\|What went wrong" build_log.txt | head -n 60 || true
           echo "==================================================="
           exit 1
         fi
@@ -246,6 +256,12 @@ jobs:
           find taktik_build/platforms/android/app/build/outputs -maxdepth 3 2>/dev/null \
             | sed 's|taktik_build/platforms/android/app/build/||' | head -40 \
             || echo "existiert nicht - Gradle hat nichts erzeugt"
+          echo '```'
+          echo ""
+          echo "### Gradles Fehlerblock"
+          echo '```'
+          sed -n '/FAILURE: Build/,/^BUILD FAILED/p' taktik_build/build_log.txt 2>/dev/null \
+            | head -40 || echo "(kein Fehlerblock)"
           echo '```'
           echo ""
           echo "### Ausgefuehrte Gradle-Tasks"
