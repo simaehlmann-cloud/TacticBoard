@@ -322,6 +322,17 @@ body.landscape-fit .dev-credits { font-size:11px; }
             <button id="delete-btn">🗑️ Objekt löschen</button>
             <button id="undo-draw-btn">↩️ Rückgängig</button>
         </div>
+        <!-- Erscheint nur, wenn ein Tor, Netz oder Korb ausgewaehlt ist.
+             Ziehen an den Griffen bleibt moeglich, ist aber auf kleinen
+             Objekten fummelig - hier trifft man immer. -->
+        <div class="row" id="item-controls" style="display:none;">
+            <button id="item-smaller" title="Kleiner">➖</button>
+            <button id="item-bigger" title="Größer">➕</button>
+            <button id="item-rot-left" title="15° nach links">↺</button>
+            <button id="item-rot-right" title="15° nach rechts">↻</button>
+            <button id="item-rot-snap" title="Gerade ausrichten">⊾</button>
+            <button id="item-reset" title="Zurücksetzen">⟲</button>
+        </div>
 
         <div class="row" id="arrow-anim-controls" style="display:none;">
             <span id="stepLabelText">Schritt:</span>
@@ -511,6 +522,7 @@ const clearAllBtn = document.getElementById('clear-all-btn');
 const sizeSlider = document.getElementById('size-slider');
 const zoomWrapper = document.getElementById('zoom-wrapper');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
+const itemControls = document.getElementById('item-controls');
 
 const tacticNameInput = document.getElementById('tactic-name-input');
 const tacticSelect = document.getElementById('tactic-select');
@@ -970,7 +982,11 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
         el.dataset.variant = v;
         el.innerHTML = `<img class="item-img" src="data:image/svg+xml;utf8,${encodeURIComponent(itemSvg(v))}" /><div class="item-resize-handle">⤡</div><div class="item-rotate-handle">↻</div>`;
         if(rotation){ el.dataset.rotation = rotation; el.style.transform = 'rotate(' + rotation + 'deg)'; }
-        setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); field.appendChild(el); return el;
+        setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); field.appendChild(el);
+        // Erst nach dem Einhaengen: vorher liefert field.clientWidth im
+        // Zweifel 0 und die Rechnung liefe ins Leere.
+        itemKastenAnpassen(el);
+        return el;
     }
 
     // Lange Namen wuerden aus dem Kreis herauslaufen: gekuerzt anzeigen,
@@ -1001,9 +1017,15 @@ function setupItemResize(el) {
             const rot = parseFloat(el.dataset.rotation || '0') * Math.PI / 180;
             const ldX = dX * Math.cos(rot) + dY * Math.sin(rot);
             const ldY = -dX * Math.sin(rot) + dY * Math.cos(rot);
-            let newW = startW + (ldX / field.clientWidth) * 100; let newH = startH + (ldY / field.clientHeight) * 100;
-            if(newW < 8) newW = 8; if(newH < 4) newH = 4; 
-            el.style.width = newW + '%'; el.style.height = newH + '%';
+            /* Nur die Breite folgt dem Finger, die Hoehe ergibt sich aus dem
+               Seitenverhaeltnis der Grafik. Freies Verzerren gab es vorher zwar,
+               aber es fuehrte nur zu Luft im Kasten und unerreichbaren Griffen. */
+            const ar = itemAspect(el.dataset.variant || 'goal');
+            let newW = startW + ((ldX + ldY * ar) / 2 / field.clientWidth) * 100;
+            if(newW < 8) newW = 8;
+            if(newW > 90) newW = 90;
+            const newH = newW * (field.clientWidth / field.clientHeight) / ar;
+            el.style.width = newW.toFixed(2) + '%'; el.style.height = newH.toFixed(2) + '%';
         }
         function endResize() {
             document.removeEventListener('touchmove', moveResize); document.removeEventListener('mousemove', moveResize);
@@ -1084,9 +1106,51 @@ function equipSvg(type, w, h){
     const s = EQUIP_SVG[type];
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + s.vb + '" width="' + (w || '100%') + '" height="' + (h || '100%') + '" style="pointer-events:none">' + s.body + '</svg>';
 }
+/* Die Masse muessen in Pixeln stehen, nicht in Prozent. Ein SVG mit
+   Prozentmassen hat keine intrinsische Groesse - html2canvas kann es beim
+   Bild-Export dann nicht richtig rastern, Tore kamen als verzerrte Flecken
+   heraus. Die Anzeige skaliert das Bild ohnehin ueber CSS auf das Objekt. */
+const ITEM_STEP = 1.15;      // ein Druck aendert die Groesse um 15 Prozent
+const ITEM_ROT_STEP = 15;    // Grad je Druck
+const ITEM_DEFAULT_W = 14, ITEM_DEFAULT_H = 8;
+
+/* Seitenverhaeltnis der Grafik eines Gegenstands, aus seiner viewBox. */
+function itemAspect(v){
+    const s = ITEM_SVG[v] || ITEM_SVG.goal;
+    const vb = String(s.vb).trim().split(/\s+/).map(Number);
+    return (vb[2] || 100) / (vb[3] || 100);
+}
+
+/* Bindet den Kasten eines Gegenstands an das Seitenverhaeltnis seiner Grafik.
+
+   Vorher hatten Kasten und Grafik unterschiedliche Proportionen; object-fit:
+   contain legte die Grafik hinein und liess den Rest als unsichtbare Luft
+   stehen - bei einem Korb 62 Prozent des Kastens. Die Griffe sassen auf den
+   Kastenecken, also im Nichts, und beim Ziehen verpuffte ein Teil der
+   Aenderung in der Fuellung.
+
+   Die sichtbare Groesse bleibt dabei erhalten: der Kasten schrumpft auf das,
+   was ohnehin zu sehen war. Damit sehen auch alte gespeicherte Taktiken
+   unveraendert aus. */
+function itemKastenAnpassen(el){
+    if(!el || !el.classList.contains('item-obj')) return;
+    const ar = itemAspect(el.dataset.variant || 'goal');
+    const fw = field.clientWidth, fh = field.clientHeight;
+    if(!fw || !fh) return;
+    const bw = (parseFloat(el.style.width)  || ITEM_DEFAULT_W) / 100 * fw;
+    const bh = (parseFloat(el.style.height) || ITEM_DEFAULT_H) / 100 * fh;
+    // object-fit:contain -> sichtbar ist der kleinere der beiden Anpassungen
+    const sichtbarB = Math.min(bw, bh * ar);
+    const sichtbarH = sichtbarB / ar;
+    el.style.width  = (sichtbarB / fw * 100).toFixed(2) + '%';
+    el.style.height = (sichtbarH / fh * 100).toFixed(2) + '%';
+}
+
 function itemSvg(v, w, h){
     const s = ITEM_SVG[v] || ITEM_SVG.goal;
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + s.vb + '" width="' + (w || '100%') + '" height="' + (h || '100%') + '" style="pointer-events:none">' + s.body + '</svg>';
+    const vb = String(s.vb).trim().split(/\s+/).map(Number);
+    const vbW = vb[2] || 100, vbH = vb[3] || 100;
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + s.vb + '" width="' + (w || vbW) + '" height="' + (h || vbH) + '" style="pointer-events:none">' + s.body + '</svg>';
 }
 function activeGoalVariant(){
     if(currentSport === 'basketball') return 'basket';
@@ -1469,6 +1533,8 @@ function selectArrow(a){
 }
 function updateButtonVisibility(){
     const realP = activePlayer && activePlayer.dataset.selectable === '1';
+    const istItem = !!activePlayer && activePlayer.classList.contains('item-obj');
+    itemControls.style.display = (istItem && !isDrawingMode) ? 'flex' : 'none';
     clearDrawingsBtn.style.display = isDrawingMode ? 'inline-flex' : 'none';
     if(isDrawingMode){ addArrowBtn.style.display = 'none'; deleteBtn.style.display = 'none'; }
     else { addArrowBtn.style.display = realP ? 'inline-flex' : 'none'; deleteBtn.style.display = (activePlayer || activeArrow) ? 'inline-flex' : 'none'; }
@@ -1776,8 +1842,14 @@ function drawFieldFrame(g, W, H, assets){
             const img = el.querySelector('.item-img');
             if(!img) return;
             const rot = parseFloat(el.dataset.rotation || '0') * Math.PI / 180;
+            /* Die Anzeige nutzt object-fit:contain. Ein schlichtes drawImage
+               auf die Objektgroesse wuerde das Tor stauchen, das GIF saehe
+               anders aus als die App. Deshalb hier dieselbe Rechnung. */
+            const iw = img.naturalWidth || w, ih = img.naturalHeight || h;
+            const sc = Math.min(w / iw, h / ih);
+            const dw = iw * sc, dh = ih * sc;
             g.save(); g.translate(x + w / 2, y + h / 2); g.rotate(rot);
-            g.drawImage(img, -w / 2, -h / 2, w, h);
+            g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
             g.restore();
             return;
         }
@@ -1964,6 +2036,9 @@ const translations = {
         msgExportUnavailable: 'Export nicht verfügbar (Internetverbindung erforderlich).',
         msgExportError: 'Fehler beim Export.',
         msgShareError: 'Datei konnte nicht weitergegeben werden.',
+        itemSmaller: 'Kleiner', itemBigger: 'Größer',
+        itemRotLeft: '15° nach links', itemRotRight: '15° nach rechts',
+        itemRotSnap: 'Gerade ausrichten', itemReset: 'Zurücksetzen',
         fullscreenOn: 'Vollbild',
         fullscreenOff: 'Vollbild beenden',
         msgSavedToGallery: 'In der Galerie gespeichert (Bilder/TacticBoard).',
@@ -2076,6 +2151,9 @@ const translations = {
         msgExportUnavailable: 'Export unavailable (internet connection required).',
         msgExportError: 'Error during export.',
         msgShareError: 'The file could not be shared.',
+        itemSmaller: 'Smaller', itemBigger: 'Larger',
+        itemRotLeft: 'Rotate 15° left', itemRotRight: 'Rotate 15° right',
+        itemRotSnap: 'Align straight', itemReset: 'Reset',
         fullscreenOn: 'Full screen',
         fullscreenOff: 'Exit full screen',
         msgSavedToGallery: 'Saved to your gallery (Pictures/TacticBoard).',
@@ -2162,6 +2240,12 @@ function applyLanguage(lang){
     if(aboutTitleEl) aboutTitleEl.textContent = t.aboutTitle;
     aboutTextEl.innerHTML = t.aboutText;
     fullscreenBtn.title = t[document.body.classList.contains('fullscreen-board') ? 'fullscreenOff' : 'fullscreenOn'];
+    document.getElementById('item-smaller').title = t.itemSmaller;
+    document.getElementById('item-bigger').title = t.itemBigger;
+    document.getElementById('item-rot-left').title = t.itemRotLeft;
+    document.getElementById('item-rot-right').title = t.itemRotRight;
+    document.getElementById('item-rot-snap').title = t.itemRotSnap;
+    document.getElementById('item-reset').title = t.itemReset;
     closeAboutBtn.textContent = t.closeBtn;
     stepLabelText.textContent = t.stepLabel;
     withBallBtn.innerHTML = t.withBallBtn;
@@ -2268,6 +2352,63 @@ closeAboutBtn.addEventListener('click', () => aboutModal.style.display = 'none')
    dann nicht mehr erreichbar. Die Einstellung wird gemerkt, damit sie nach
    einem versehentlichen Wischen nicht ueberrascht. */
 const ZOOM_KEY = 'tacticboard_zoom';
+/* ---------------------------------------------------
+   GROESSE UND DREHUNG UEBER KNOEPFE
+
+   Die Griffe am Objekt bleiben, sind auf einem flachen Tor aber schwer
+   zu bedienen. Diese Zeile erscheint, sobald ein Tor, Netz oder Korb
+   ausgewaehlt ist, und trifft immer.
+--------------------------------------------------- */
+function itemPercent(el, achse){
+    const roh = parseFloat(el.style[achse]);
+    if(!isNaN(roh)) return roh;
+    // Noch nie veraendert: aus der tatsaechlichen Groesse zurueckrechnen
+    return achse === 'width'
+        ? el.offsetWidth / field.clientWidth * 100
+        : el.offsetHeight / field.clientHeight * 100;
+}
+
+function itemGroesseAendern(faktor){
+    if(!activePlayer || !activePlayer.classList.contains('item-obj')) return;
+    const ar = itemAspect(activePlayer.dataset.variant || 'goal');
+    const w = Math.max(8, Math.min(90, itemPercent(activePlayer, 'width') * faktor));
+    const h = w * (field.clientWidth / field.clientHeight) / ar;
+    activePlayer.style.width = w.toFixed(2) + '%';
+    activePlayer.style.height = h.toFixed(2) + '%';
+}
+
+function itemDrehen(grad){
+    if(!activePlayer || !activePlayer.classList.contains('item-obj')) return;
+    let rot = parseFloat(activePlayer.dataset.rotation || '0') + grad;
+    rot = ((rot % 360) + 360) % 360;
+    activePlayer.dataset.rotation = rot;
+    activePlayer.style.transform = 'rotate(' + rot + 'deg)';
+}
+
+function itemAusrichten(){
+    if(!activePlayer || !activePlayer.classList.contains('item-obj')) return;
+    const rot = parseFloat(activePlayer.dataset.rotation || '0');
+    const gerade = Math.round(rot / 90) * 90 % 360;
+    activePlayer.dataset.rotation = gerade;
+    activePlayer.style.transform = 'rotate(' + gerade + 'deg)';
+}
+
+function itemZuruecksetzen(){
+    if(!activePlayer || !activePlayer.classList.contains('item-obj')) return;
+    const ar = itemAspect(activePlayer.dataset.variant || 'goal');
+    activePlayer.style.width = ITEM_DEFAULT_W + '%';
+    activePlayer.style.height = (ITEM_DEFAULT_W * (field.clientWidth / field.clientHeight) / ar).toFixed(2) + '%';
+    activePlayer.dataset.rotation = 0;
+    activePlayer.style.transform = '';
+}
+
+document.getElementById('item-smaller').addEventListener('click', () => itemGroesseAendern(1 / ITEM_STEP));
+document.getElementById('item-bigger').addEventListener('click', () => itemGroesseAendern(ITEM_STEP));
+document.getElementById('item-rot-left').addEventListener('click', () => itemDrehen(-ITEM_ROT_STEP));
+document.getElementById('item-rot-right').addEventListener('click', () => itemDrehen(ITEM_ROT_STEP));
+document.getElementById('item-rot-snap').addEventListener('click', itemAusrichten);
+document.getElementById('item-reset').addEventListener('click', itemZuruecksetzen);
+
 /* Vollbild: Kopfzeile und Nr/Name-Zeile ausblenden. Beide sind danach
    display:none, ihr offsetHeight ist 0 - fitFieldToScreen rechnet also von
    selbst mit dem gewonnenen Platz, ohne Sonderfall. */
