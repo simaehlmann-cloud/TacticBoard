@@ -25,10 +25,16 @@
 
         <!-- FileProvider: gibt die Exportdatei als content://-URI weiter,
              statt einen file://-Pfad zu teilen. Ohne das wirft Android ab
-             API 24 eine FileUriExposedException. -->
+             API 24 eine FileUriExposedException.
+
+             WICHTIG: eigene Unterklasse TbFileProvider statt
+             androidx.core.content.FileProvider. Cordova deklariert diese
+             Klasse bereits selbst; ein zweiter Eintrag mit demselben
+             Klassennamen wird vom Manifest-Merger zusammengefasst und eine
+             der Authorities geht verloren. -->
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <provider
-                android:name="androidx.core.content.FileProvider"
+                android:name="de.tacticboard.share.TbFileProvider"
                 android:authorities="${applicationId}.tbshare"
                 android:exported="false"
                 android:grantUriPermissions="true">
@@ -43,6 +49,7 @@
              nichts und macht das Anlegen ueber die GitHub-Weboberflaeche
              unnoetig fehleranfaellig. -->
         <source-file src="TbShare.java" target-dir="src/de/tacticboard/share" />
+        <source-file src="TbFileProvider.java" target-dir="src/de/tacticboard/share" />
         <resource-file src="tb_file_paths.xml" target="res/xml/tb_file_paths.xml" />
     </platform>
 </plugin>
