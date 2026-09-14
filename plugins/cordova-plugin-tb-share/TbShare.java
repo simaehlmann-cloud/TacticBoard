@@ -107,9 +107,27 @@ public class TbShare extends CordovaPlugin {
         intent.setClipData(ClipData.newUri(cordova.getActivity().getContentResolver(),
                 ziel.getName(), uri));
 
-        Intent auswahl = Intent.createChooser(intent, null);
-        auswahl.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        cordova.getActivity().startActivity(auswahl);
+        starteAuswahl(intent);
+    }
+
+    /**
+     * Oeffnet das Teilen-Menue. Fuer exotische MIME-Typen wie application/json
+     * hat kaum ein Geraet einen Empfaenger - startActivity wirft dann
+     * ActivityNotFoundException und der Export schlaegt fehl, obwohl die Datei
+     * laengst geschrieben ist. In dem Fall nochmal mit */* versuchen, damit
+     * Dateimanager, Cloud-Dienste und Mail-Apps als Ziel auftauchen.
+     */
+    private void starteAuswahl(Intent intent) {
+        try {
+            Intent auswahl = Intent.createChooser(intent, null);
+            auswahl.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            cordova.getActivity().startActivity(auswahl);
+        } catch (android.content.ActivityNotFoundException e) {
+            intent.setType("*/*");
+            Intent auswahl = Intent.createChooser(intent, null);
+            auswahl.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            cordova.getActivity().startActivity(auswahl);
+        }
     }
 
     /**
