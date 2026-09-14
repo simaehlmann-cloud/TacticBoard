@@ -1908,7 +1908,7 @@ exportGifBtn.addEventListener('click', async () => {
     gif.on('finished', blob => {
         dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Animation'), '.gif'), 'image/gif', true)
             .then(wohin => showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgGifDone))
-            .catch(err => { console.error('GIF-Export:', err); showToast(translations[LANG].msgShareError); })
+            .catch(err => { console.error('GIF-Export:', err); showToast(translations[LANG].msgShareError + ' (' + kurzFehler(err) + ')'); })
             .finally(() => { exportGifBtn.disabled = false; });
     });
     gif.render();
@@ -2850,6 +2850,13 @@ function blobZuBase64(blob){
     });
 }
 
+/* Der Grund gehoert in die Meldung. Ohne ihn sieht man auf fremden Geraeten
+   nur "hat nicht geklappt" und kann nichts damit anfangen. */
+function kurzFehler(e){
+    const t = (e && (e.message || e.name)) ? (e.message || e.name) : String(e);
+    return String(t).replace(/\s+/g, ' ').slice(0, 60);
+}
+
 async function dateiSichern(blob, name, mimeTyp, inGalerie){
     if(window.TbShare && window.TbShare.shareFile){
         const b64 = await blobZuBase64(blob);
@@ -2901,7 +2908,7 @@ exportTacticsBtn.addEventListener('click', () => {
     const rawName = chosen.length === 1 ? chosen[0].name : 'Alle_Taktiken';
     dateiSichern(blob, dateiname('TacticBoard_' + rawName, '.json'), 'application/json')
         .then(() => showToast(chosen.length === 1 ? translations[LANG].msgExportedOne : translations[LANG].msgExportedAll))
-        .catch(err => { console.error('Export:', err); showToast(translations[LANG].msgShareError); });
+        .catch(err => { console.error('Export:', err); showToast(translations[LANG].msgShareError + ' (' + kurzFehler(err) + ')'); });
 });
 /* ---- Pruefung importierter Taktikdateien ----------------------------
    Der JSON-Import ist die einzige Stelle, an der fremde Daten in die App
