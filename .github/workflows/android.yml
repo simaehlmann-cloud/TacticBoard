@@ -258,6 +258,17 @@ jobs:
             || echo "existiert nicht - Gradle hat nichts erzeugt"
           echo '```'
           echo ""
+          echo "### Provider im ZUSAMMENGEFUEHRTEN Manifest"
+          echo '```'
+          mm=$(find taktik_build/platforms/android/app/build -name 'AndroidManifest.xml' \
+                 -path '*merged*' 2>/dev/null | head -1)
+          if [ -n "$mm" ]; then
+            grep -o 'android:authorities="[^"]*"' "$mm" || echo "keine Authority im Manifest"
+          else
+            echo "(kein zusammengefuehrtes Manifest - Build kam nicht so weit)"
+          fi
+          echo '```'
+          echo ""
           echo "### Gradles Fehlerblock"
           echo '```'
           sed -n '/FAILURE: Build/,/^BUILD FAILED/p' taktik_build/build_log.txt 2>/dev/null \
