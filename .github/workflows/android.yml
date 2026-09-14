@@ -223,14 +223,50 @@ jobs:
     - name: Build-Ergebnisse auflisten
       if: always()
       run: |
-        echo "HAS_KEYSTORE = ${HAS_KEYSTORE:-<leer>}"
-        d=taktik_build/platforms/android/app/build/outputs
-        if [ -d "$d" ]; then
-          echo "--- gefundene Pakete ---"
-          find "$d" -type f \( -name '*.apk' -o -name '*.aab' \) -printf '%10s  %p\n' | sort -k2
-        else
-          echo "::warning::$d existiert nicht - es wurde gar nichts gebaut."
-        fi
+        # Schreibt zusaetzlich in die Job-Zusammenfassung. Die steht oben auf
+        # der Uebersichtsseite des Laufs - man muss keinen Schritt aufklappen.
+        {
+          echo "## Build-Diagnose"
+          echo ""
+          echo "HAS_KEYSTORE = \`${HAS_KEYSTORE:-<leer>}\`"
+          echo ""
+          echo "### Gefundene Pakete im gesamten Android-Projekt"
+          echo '```'
+          if [ -d taktik_build/platforms/android ]; then
+            gefunden=$(find taktik_build/platforms/android -type f \
+                       \( -name '*.apk' -o -name '*.aab' \) -printf '%10s  %P\n' | sort -k2)
+            if [ -n "$gefunden" ]; then echo "$gefunden"; else echo "KEINE"; fi
+          else
+            echo "platforms/android existiert nicht"
+          fi
+          echo '```'
+          echo ""
+          echo "### Inhalt von app/build/outputs"
+          echo '```'
+          find taktik_build/platforms/android/app/build/outputs -maxdepth 3 2>/dev/null \
+            | sed 's|taktik_build/platforms/android/app/build/||' | head -40 \
+            || echo "existiert nicht - Gradle hat nichts erzeugt"
+          echo '```'
+          echo ""
+          echo "### Ausgefuehrte Gradle-Tasks"
+          echo '```'
+          grep -o '> Task :[^ ]*.*' taktik_build/build_log.txt 2>/dev/null | tail -40 \
+            || echo "keine Task-Zeilen im Log"
+          echo '```'
+          echo ""
+          echo "### Enthaelt das Log den Assemble-Task?"
+          echo '```'
+          grep -i -c "assembleDebug\|cdvBuildDebug\|packageDebug" taktik_build/build_log.txt 2>/dev/null \
+            | sed 's/^/Treffer: /' || echo "kein Log"
+          grep -i "Built the following\|No APK\|SKIPPED\|UP-TO-DATE" taktik_build/build_log.txt 2>/dev/null \
+            | tail -10 || true
+          echo '```'
+          echo ""
+          echo "### Letzte Zeilen des Build-Logs"
+          echo '```'
+          tail -30 taktik_build/build_log.txt 2>/dev/null || echo "kein build_log.txt"
+          echo '```'
+        } | tee -a "$GITHUB_STEP_SUMMARY"
 
     - name: Upload Debug APK
       if: env.HAS_KEYSTORE != 'true'
