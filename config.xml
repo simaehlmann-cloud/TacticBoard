@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <!-- WICHTIG: Vor jedem Play-Store-Update die version erhoehen (z.B. 2.1.3 -> 2.1.4) -->
-<widget id="de.tacticboard.app" version="2.1.3" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+<widget id="de.tacticboard.app" version="2.2.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>TacticBoard</name>
     <description>Offline-Taktiktafel für das Sport-Training mit animierbaren Spielzügen</description>
     <author email="smaehlmann.appdev@gmail.com">Simon Mählmann</author>
