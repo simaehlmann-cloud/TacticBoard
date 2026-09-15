@@ -254,6 +254,17 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
 .modal-content { background:#1d3557; padding:24px; border-radius:12px; max-width:400px; width: 90%; max-height:80vh; overflow-y:auto; text-align:center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); box-sizing:border-box; border: 1px solid rgba(255,255,255,0.1); }
 .modal-title { font-weight:bold; font-size:22px; margin-bottom:15px; color: #4caf50;}
 .modal-text { font-size: 14px; line-height: 1.6; margin-bottom: 20px; text-align: left;}
+/* Der Rechtstext wird aus datenschutz.html bzw. impressum.html nachgeladen.
+   Die Seiten bringen ihr eigenes helles Design mit; hier zaehlt nur der
+   Inhalt, das Aussehen kommt von diesen Regeln. */
+#legal-modal .modal-content { max-width:560px; max-height:86vh; }
+#legal-body { text-align:left; }
+#legal-body h2 { font-size:16px; color:#4caf50; margin:18px 0 6px; }
+#legal-body p, #legal-body li { font-size:13.5px; line-height:1.65; }
+#legal-body ul { padding-left:20px; margin:6px 0; }
+#legal-body address { font-style:normal; display:block; margin:6px 0; }
+#legal-body a { color:#8ecf92; word-break:break-word; }
+#legal-body .stand { font-size:12px; color:#9fb3c8; margin:0 0 14px; }
 
 /* QUERFORMAT: Das Feld steht ganz oben und bekommt die komplette
    Bildschirmhoehe. Alle Bedienelemente liegen darunter und werden
@@ -427,8 +438,18 @@ body.landscape-fit .dev-credits { font-size:11px; }
         Entwickelt von <strong>Simon Mählmann</strong>.
     </div>
     <div id="app-version" style="font-size:12px; color:#9fb3c8; margin-bottom:14px;">Version 2.2.0</div>
+    <button id="show-privacy-btn" style="background:#3d6b8a; width: 100%; justify-content:center; margin-bottom:8px;">Datenschutzerklärung</button>
+    <button id="show-imprint-btn" style="background:#3d6b8a; width: 100%; justify-content:center; margin-bottom:8px;">Impressum</button>
     <button id="show-onboarding-btn" style="background:#457b9d; width: 100%; justify-content:center; margin-bottom:8px;">Kurzanleitung</button>
     <button id="close-about-btn" style="background:#2a9d8f; width: 100%; justify-content:center;">Schließen</button>
+  </div>
+</div>
+
+<div id="legal-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-title" id="legal-title">Rechtliches</div>
+    <div class="modal-text" id="legal-body"></div>
+    <button id="close-legal-btn" style="background:#2a9d8f; width:100%; justify-content:center;">Schließen</button>
   </div>
 </div>
 
@@ -522,6 +543,9 @@ const clearAllBtn = document.getElementById('clear-all-btn');
 const sizeSlider = document.getElementById('size-slider');
 const zoomWrapper = document.getElementById('zoom-wrapper');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
+const legalModal = document.getElementById('legal-modal');
+const legalTitle = document.getElementById('legal-title');
+const legalBody = document.getElementById('legal-body');
 const itemControls = document.getElementById('item-controls');
 
 const tacticNameInput = document.getElementById('tactic-name-input');
@@ -2039,6 +2063,10 @@ const translations = {
         itemSmaller: 'Kleiner', itemBigger: 'Größer',
         itemRotLeft: '15° nach links', itemRotRight: '15° nach rechts',
         itemRotSnap: 'Gerade ausrichten', itemReset: 'Zurücksetzen',
+        legalPrivacy: 'Datenschutzerklärung',
+        legalImprint: 'Impressum',
+        legalLoading: 'Wird geladen …',
+        legalError: 'Der Text konnte nicht geladen werden.',
         fullscreenOn: 'Vollbild',
         fullscreenOff: 'Vollbild beenden',
         msgSavedToGallery: 'In der Galerie gespeichert (Bilder/TacticBoard).',
@@ -2154,6 +2182,10 @@ const translations = {
         itemSmaller: 'Smaller', itemBigger: 'Larger',
         itemRotLeft: 'Rotate 15° left', itemRotRight: 'Rotate 15° right',
         itemRotSnap: 'Align straight', itemReset: 'Reset',
+        legalPrivacy: 'Privacy policy',
+        legalImprint: 'Legal notice',
+        legalLoading: 'Loading …',
+        legalError: 'The text could not be loaded.',
         fullscreenOn: 'Full screen',
         fullscreenOff: 'Exit full screen',
         msgSavedToGallery: 'Saved to your gallery (Pictures/TacticBoard).',
@@ -2240,6 +2272,8 @@ function applyLanguage(lang){
     if(aboutTitleEl) aboutTitleEl.textContent = t.aboutTitle;
     aboutTextEl.innerHTML = t.aboutText;
     fullscreenBtn.title = t[document.body.classList.contains('fullscreen-board') ? 'fullscreenOff' : 'fullscreenOn'];
+    document.getElementById('show-privacy-btn').textContent = t.legalPrivacy;
+    document.getElementById('show-imprint-btn').textContent = t.legalImprint;
     document.getElementById('item-smaller').title = t.itemSmaller;
     document.getElementById('item-bigger').title = t.itemBigger;
     document.getElementById('item-rot-left').title = t.itemRotLeft;
@@ -2547,6 +2581,9 @@ deleteTacticBtn.addEventListener('click', () => {
 let backExitArmed = 0;
 
 function closeTopmostLayer(){
+    // 0. Rechtstext zuerst - er liegt ueber dem Ueber-Dialog, der offen bleiben soll
+    if(legalModal.style.display === 'flex'){ legalModal.style.display = 'none'; return true; }
+
     // 1. offene Dialoge
     const modals = [...document.querySelectorAll('.modal-overlay')]
         .filter(m => m.style.display && m.style.display !== 'none');
@@ -3054,6 +3091,47 @@ exportImgBtn.addEventListener('click', () => {
         });
     }, 150);
 });
+
+/* ---------------------------------------------------
+   DATENSCHUTZ UND IMPRESSUM IN DER APP
+
+   Beide Seiten liegen als eigene Dateien im Paket. Ein schlichter Link
+   wuerde die App verlassen - das ungespeicherte Taktikbrett waere weg.
+   Deshalb wird nur der Inhalt nachgeladen und in ein Overlay gesetzt.
+--------------------------------------------------- */
+async function zeigeRechtstext(datei, titelSchluessel){
+    const t = translations[LANG];
+    legalTitle.textContent = t[titelSchluessel];
+    legalBody.textContent = t.legalLoading;
+    legalModal.style.display = 'flex';
+    try {
+        const antwort = await fetch(datei, { cache: 'no-cache' });
+        if(!antwort.ok) throw new Error('HTTP ' + antwort.status);
+        const doc = new DOMParser().parseFromString(await antwort.text(), 'text/html');
+        const inhalt = doc.querySelector('main');
+        if(!inhalt) throw new Error('kein <main> in ' + datei);
+        // Ueberschrift und Fussleiste der Seite entfallen: der Titel steht im
+        // Dialogkopf, und zum Schliessen gibt es den eigenen Knopf.
+        inhalt.querySelectorAll('script, style, h1, .links').forEach(el => el.remove());
+        // Externe Verweise im Systembrowser oeffnen, nicht in der App
+        inhalt.querySelectorAll('a[href^="http"]').forEach(a => {
+            a.setAttribute('target', '_blank');
+            a.setAttribute('rel', 'noopener');
+        });
+        legalBody.innerHTML = inhalt.innerHTML;
+        legalBody.scrollTop = 0;
+    } catch(e){
+        console.error('Rechtstext:', e);
+        legalBody.textContent = t.legalError;
+    }
+}
+
+document.getElementById('show-privacy-btn')
+    .addEventListener('click', () => zeigeRechtstext('datenschutz.html', 'legalPrivacy'));
+document.getElementById('show-imprint-btn')
+    .addEventListener('click', () => zeigeRechtstext('impressum.html', 'legalImprint'));
+document.getElementById('close-legal-btn')
+    .addEventListener('click', () => { legalModal.style.display = 'none'; });
 
 /* ---------------------------------------------------
    ARBEITSSTAND AUTOMATISCH SICHERN

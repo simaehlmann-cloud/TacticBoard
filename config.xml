@@ -6,6 +6,9 @@
     <author email="smaehlmann.appdev@gmail.com">Simon Mählmann</author>
     <content src="index.html" />
     <access origin="*" />
+    <!-- Ohne mailto passiert beim Tippen auf die E-Mail-Adresse in
+         Datenschutz und Impressum schlicht nichts. -->
+    <allow-intent href="mailto:*" />
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
 
