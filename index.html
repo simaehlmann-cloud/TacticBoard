@@ -2,9 +2,14 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<!-- Content-Security-Policy: die App laedt ausser der CDN-Rueckfallebene fuer
-     html2canvas/gif.js nichts von fremden Servern. Falls im Cordova-Build je
-     etwas nicht laedt, ist diese Zeile der erste Verdaechtige. -->
+<!-- Content-Security-Policy. Diese Fassung gilt fuer die Web-Version auf
+     GitHub Pages: dort liegt kein libs/, deshalb ist cdnjs als Rueckfallebene
+     fuer html2canvas und gif.js erlaubt.
+     Der Workflow ersetzt diese Zeile fuer den App-Build durch eine strenge
+     Fassung ohne cdnjs - in der App sind die Bibliotheken im Paket, und eine
+     Offline-Kauf-App soll von sich aus keine Verbindung nach aussen aufbauen.
+     Falls im Cordova-Build je etwas nicht laedt, ist diese Zeile der erste
+     Verdaechtige. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob: https://cdnjs.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <title>TacticBoard</title>
@@ -13,10 +18,17 @@
 <link rel="apple-touch-icon" href="image.png">
 <link rel="manifest" href="manifest.json">
 <script>
-// html2canvas: erst lokal (im App-Build gebündelt), sonst vom CDN (Web-Version)
+// html2canvas liegt im App-Paket unter libs/. Nur die Web-Fassung auf
+// GitHub Pages hat kein libs/ und darf notfalls vom CDN nachladen.
+// In der App wird der Rueckfall gesperrt: eine Offline-Kauf-App soll von
+// sich aus keine Verbindung nach aussen aufbauen.
+// Cordova liefert unter https://localhost (Android) bzw. app://localhost (iOS) aus.
+window.TB_IM_APP = (location.hostname === 'localhost' || location.protocol === 'file:');
 (function(){
   function load(src, onerr){ var s = document.createElement('script'); s.defer = true; s.src = src; if(onerr) s.onerror = onerr; document.head.appendChild(s); }
-  load('libs/html2canvas.min.js', function(){ load('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); });
+  load('libs/html2canvas.min.js', window.TB_IM_APP ? null : function(){
+    load('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  });
 })();
 </script>
 
@@ -1825,6 +1837,9 @@ function loadGifLib(){
             const txt = await r.text();
             return URL.createObjectURL(new Blob([txt], { type: 'application/javascript' }));
         } catch(e){
+            // In der App kein Ausweichen ins Netz - fehlt die Datei dort,
+            // ist das ein Paketierungsfehler und soll auffallen.
+            if(window.TB_IM_APP) throw e;
             await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js');
             const txt = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js').then(r => r.text());
             return URL.createObjectURL(new Blob([txt], { type: 'application/javascript' }));
