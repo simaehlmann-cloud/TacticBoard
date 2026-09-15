@@ -277,6 +277,7 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
 #legal-body address { font-style:normal; display:block; margin:6px 0; }
 #legal-body a { color:#8ecf92; word-break:break-word; }
 #legal-body .stand { font-size:12px; color:#9fb3c8; margin:0 0 14px; }
+#legal-body .hinweis { font-size:12px; color:#9fb3c8; margin:0 0 14px; font-style:italic; }
 
 /* QUERFORMAT: Das Feld steht ganz oben und bekommt die komplette
    Bildschirmhoehe. Alle Bedienelemente liegen darunter und werden
@@ -443,7 +444,7 @@ body.landscape-fit .dev-credits { font-size:11px; }
     <div class="modal-text" id="about-text">
         <strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
-        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: der grüne unten rechts ändert die Größe, der blaue oben links dreht das Objekt. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: mit zwei Fingern lassen sie sich aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
         Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
@@ -1018,7 +1019,7 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
         el.dataset.variant = v;
         el.innerHTML = `<img class="item-img" src="data:image/svg+xml;utf8,${encodeURIComponent(itemSvg(v))}" /><div class="item-resize-handle">⤡</div><div class="item-rotate-handle">↻</div>`;
         if(rotation){ el.dataset.rotation = rotation; el.style.transform = 'rotate(' + rotation + 'deg)'; }
-        setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); field.appendChild(el);
+        setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); setupItemPinch(el); field.appendChild(el);
         // Erst nach dem Einhaengen: vorher liefert field.clientWidth im
         // Zweifel 0 und die Rechnung liefe ins Leere.
         itemKastenAnpassen(el);
@@ -1034,6 +1035,64 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
         applyLabelSize(el);
     }
     setupPercentDrag(el, sizePercent); field.appendChild(el); return el;
+}
+
+/* Zwei-Finger-Geste fuer Tore, Koerbe und Netze: aufziehen aendert die
+   Groesse, verdrehen dreht das Objekt. Das ist die Bedienung, die man vom
+   Betrachten von Fotos kennt - und sie trifft immer, im Gegensatz zu einem
+   Griff von 28 Pixeln auf einem flachen Tor.
+   Griffe und Knopfzeile bleiben zusaetzlich bestehen. */
+function setupItemPinch(el){
+    let startAbstand = 0, startWinkel = 0, startBreite = 0, startDrehung = 0, aktiv = false;
+
+    function abstand(t){
+        return Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+    }
+    function winkel(t){
+        return Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * 180 / Math.PI;
+    }
+
+    function bewege(ev){
+        if(!aktiv || !ev.touches || ev.touches.length < 2) return;
+        if(ev.cancelable) ev.preventDefault();
+        const ar = itemAspect(el.dataset.variant || 'goal');
+
+        const faktor = abstand(ev.touches) / startAbstand;
+        const w = Math.max(8, Math.min(90, startBreite * faktor));
+        el.style.width = w.toFixed(2) + '%';
+        el.style.height = (w * (field.clientWidth / field.clientHeight) / ar).toFixed(2) + '%';
+
+        let rot = startDrehung + (winkel(ev.touches) - startWinkel);
+        rot = ((rot % 360) + 360) % 360;
+        // Sanftes Einrasten auf Viertelschritte, damit ein Tor wieder exakt
+        // gerade wird, ohne dass die Drehung zaeh wirkt.
+        const gerade = Math.round(rot / 90) * 90;
+        if(Math.abs(rot - gerade) < 4) rot = gerade % 360;
+        el.dataset.rotation = rot;
+        el.style.transform = 'rotate(' + rot + 'deg)';
+    }
+
+    function ende(ev){
+        if(ev.touches && ev.touches.length >= 2) return;
+        aktiv = false;
+        document.removeEventListener('touchmove', bewege);
+        document.removeEventListener('touchend', ende);
+        document.removeEventListener('touchcancel', ende);
+    }
+
+    el.addEventListener('touchstart', ev => {
+        if(ev.touches.length !== 2 || isDrawingMode || isAnimating) return;
+        if(ev.cancelable) ev.preventDefault();
+        selectPlayer(el);
+        aktiv = true;
+        startAbstand = abstand(ev.touches) || 1;
+        startWinkel = winkel(ev.touches);
+        startBreite = itemPercent(el, 'width');
+        startDrehung = parseFloat(el.dataset.rotation || '0');
+        document.addEventListener('touchmove', bewege, { passive: false });
+        document.addEventListener('touchend', ende);
+        document.addEventListener('touchcancel', ende);
+    }, { passive: false });
 }
 
 function setupItemResize(el) {
@@ -1281,6 +1340,9 @@ function setupPercentDrag(el, size) {
         sX = e.touches ? e.touches[0].clientX : e.clientX; sY = e.touches ? e.touches[0].clientY : e.clientY;
         sL = parseFloat(el.style.left) || 0; sT = parseFloat(el.style.top) || 0;
         function moveDrag(ev) {
+            // Zwei Finger bedeuten Groesse und Drehung, nicht Verschieben.
+            // Ohne diese Zeile wuerde das Objekt beim Aufziehen mitwandern.
+            if (ev.touches && ev.touches.length > 1) return;
             const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
             let fL = sL + ((cX - sX) / field.clientWidth) * 100;
             let fT = sT + ((cY - sY) / field.clientHeight) * 100;
@@ -2032,7 +2094,7 @@ const translations = {
         aboutTitle: 'Über TacticBoard',
         aboutText: `<strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
-        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: der grüne unten rechts ändert die Größe, der blaue oben links dreht das Objekt. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: mit zwei Fingern lassen sie sich aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
         <u>Trainingsgeräte & Tore:</u> Kurzes Tippen erstellt das zuletzt gewählte Gerät bzw. Tor – gedrückt halten öffnet die Auswahl (Plättchen, Stangen, Koordinationsleiter, Freistoßdummys bzw. Groß-, Klein- und Minitor). Plättchen und Stangen lassen sich wie Hütchen einfärben, Tore am ↻-Griff drehen. <br><br>
@@ -2151,7 +2213,7 @@ const translations = {
         aboutTitle: 'About TacticBoard',
         aboutText: `<strong>TacticBoard</strong> is a digital tactics board for coaches and players. <br><br>
         Place players, opponents, balls, goals and cones on dynamic fields (football, basketball, handball, volleyball, ice hockey) and draw movement paths and arrows. <br><br>
-        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: the green one at the bottom right resizes, the blue one at the top left rotates. <br><br>
+        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: pinch with two fingers to resize and rotate them. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
         <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes.<br><br>
         <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. <br><br>
         <u>Training equipment & goals:</u> A short tap creates the last selected item – press and hold to open the selection (flat markers, poles, agility ladder, free-kick dummies, or full/small/mini goals). Flat markers and poles can be colored like cones, goals can be rotated using the ↻ handle. <br><br>
@@ -3114,17 +3176,26 @@ exportImgBtn.addEventListener('click', () => {
    wuerde die App verlassen - das ungespeicherte Taktikbrett waere weg.
    Deshalb wird nur der Inhalt nachgeladen und in ein Overlay gesetzt.
 --------------------------------------------------- */
-async function zeigeRechtstext(datei, titelSchluessel){
+async function zeigeRechtstext(basis, titelSchluessel){
     const t = translations[LANG];
     legalTitle.textContent = t[titelSchluessel];
     legalBody.textContent = t.legalLoading;
     legalModal.style.display = 'flex';
     try {
-        const antwort = await fetch(datei, { cache: 'no-cache' });
+        // Bei eingestelltem Englisch die Uebersetzung laden. Fehlt sie aus
+        // irgendeinem Grund, faellt es auf die deutsche Fassung zurueck -
+        // ein Rechtstext soll nie ganz fehlen.
+        let antwort = null;
+        if(LANG === 'en'){
+            try { antwort = await fetch(basis + '-en.html', { cache: 'no-cache' }); }
+            catch(e){ antwort = null; }
+            if(antwort && !antwort.ok) antwort = null;
+        }
+        if(!antwort) antwort = await fetch(basis + '.html', { cache: 'no-cache' });
         if(!antwort.ok) throw new Error('HTTP ' + antwort.status);
         const doc = new DOMParser().parseFromString(await antwort.text(), 'text/html');
         const inhalt = doc.querySelector('main');
-        if(!inhalt) throw new Error('kein <main> in ' + datei);
+        if(!inhalt) throw new Error('kein <main> in ' + basis);
         // Ueberschrift und Fussleiste der Seite entfallen: der Titel steht im
         // Dialogkopf, und zum Schliessen gibt es den eigenen Knopf.
         inhalt.querySelectorAll('script, style, h1, .links').forEach(el => el.remove());
@@ -3142,9 +3213,9 @@ async function zeigeRechtstext(datei, titelSchluessel){
 }
 
 document.getElementById('show-privacy-btn')
-    .addEventListener('click', () => zeigeRechtstext('datenschutz.html', 'legalPrivacy'));
+    .addEventListener('click', () => zeigeRechtstext('datenschutz', 'legalPrivacy'));
 document.getElementById('show-imprint-btn')
-    .addEventListener('click', () => zeigeRechtstext('impressum.html', 'legalImprint'));
+    .addEventListener('click', () => zeigeRechtstext('impressum', 'legalImprint'));
 document.getElementById('close-legal-btn')
     .addEventListener('click', () => { legalModal.style.display = 'none'; });
 

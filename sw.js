@@ -16,7 +16,9 @@ const ASSETS = [
   './image.png',
   './icon_maskable.png',
   './datenschutz.html',
-  './impressum.html'
+  './impressum.html',
+  './datenschutz-en.html',
+  './impressum-en.html'
 ];
 
 self.addEventListener('install', event => {
