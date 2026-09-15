@@ -106,6 +106,8 @@ jobs:
         cp icon_maskable.png taktik_build/www/icon_maskable.png
         cp datenschutz.html taktik_build/www/datenschutz.html
         cp impressum.html taktik_build/www/impressum.html
+        cp datenschutz-en.html taktik_build/www/datenschutz-en.html
+        cp impressum-en.html taktik_build/www/impressum-en.html
         cp config.xml taktik_build/config.xml
 
     - name: App-Fassung haerten
