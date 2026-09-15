@@ -108,6 +108,39 @@ jobs:
         cp impressum.html taktik_build/www/impressum.html
         cp config.xml taktik_build/config.xml
 
+    - name: App-Fassung haerten
+      run: |
+        set -euo pipefail
+        # Die Web-Fassung auf GitHub Pages braucht den CDN-Rueckfall, weil dort
+        # kein libs/ liegt. Die App braucht ihn nicht - dort sind die
+        # Bibliotheken im Paket. Deshalb bekommt NUR die App-Fassung eine
+        # strenge Content-Security-Policy ohne cdnjs. Der Riegel in index.html
+        # (window.TB_IM_APP) verhindert den Versuch, die CSP verhindert den
+        # Erfolg - zwei unabhaengige Schichten.
+        python3 - <<'PYEOF'
+        import re, sys
+        pfad = 'taktik_build/www/index.html'
+        s = open(pfad, encoding='utf-8').read()
+        streng = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                  "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+                  "connect-src 'self' data: blob:; worker-src 'self' blob:; "
+                  "child-src 'self' blob:; font-src 'self'; object-src 'none'; "
+                  "base-uri 'self'; form-action 'none'")
+        neu, n = re.subn(r'(<meta http-equiv="Content-Security-Policy" content=")[^"]*(")',
+                         lambda m: m.group(1) + streng + m.group(2), s, count=1)
+        if n != 1:
+            sys.exit('FEHLER: CSP-Meta-Tag nicht gefunden - index.html veraendert?')
+        open(pfad, 'w', encoding='utf-8').write(neu)
+        print('CSP der App-Fassung verschaerft.')
+        PYEOF
+        echo "--- Kontrolle ---"
+        if grep -q 'cdnjs' <(grep -o 'Content-Security-Policy[^>]*' taktik_build/www/index.html); then
+          echo "::error::cdnjs steht noch in der CSP der App-Fassung."
+          exit 1
+        fi
+        echo "CSP der App enthaelt kein cdnjs mehr."
+        grep -c 'TB_IM_APP' taktik_build/www/index.html | sed 's/^/TB_IM_APP-Riegel gefunden: /'
+
     - name: App-Icons erzeugen
       run: |
         set -euo pipefail
