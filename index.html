@@ -444,7 +444,7 @@ body.landscape-fit .dev-credits { font-size:11px; }
     <div class="modal-text" id="about-text">
         <strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
-        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen, dann lassen sie sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen - sie bleiben dann ausgewählt und lassen sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Ein erneuter Tipp darauf hebt die Auswahl auf. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
         Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
@@ -1354,6 +1354,11 @@ function setupPercentDrag(el, size) {
         if (isDrawingMode || isAnimating) return;
         const node = e.target.nodeName.toLowerCase();
         if (node !== 'button' && node !== 'input' && e.cancelable) e.preventDefault();
+        // Tore, Netze und Koerbe bleiben beim Tippen aufs Feld ausgewaehlt.
+        // Damit man sie wieder loswird, hebt ein erneutes Antippen ohne
+        // Verschieben die Auswahl auf.
+        const warGewaehlt = (el === activePlayer) && el.classList.contains('item-obj');
+        let verschoben = false;
         selectPlayer(el);
         sX = e.touches ? e.touches[0].clientX : e.clientX; sY = e.touches ? e.touches[0].clientY : e.clientY;
         sL = parseFloat(el.style.left) || 0; sT = parseFloat(el.style.top) || 0;
@@ -1367,8 +1372,10 @@ function setupPercentDrag(el, size) {
             const max = 100 - size;
             if (fL < 0) fL = 0; if (fT < 0) fT = 0; if (fL > max) fL = max; if (fT > max) fT = max;
             el.style.left = fL + '%'; el.style.top = fT + '%';
+            verschoben = true;
         }
         function endDrag() {
+            if (warGewaehlt && !verschoben) selectPlayer(null);
             document.removeEventListener('touchmove', moveDrag); document.removeEventListener('touchend', endDrag);
             document.removeEventListener('mousemove', moveDrag); document.removeEventListener('mouseup', endDrag);
         }
@@ -1673,8 +1680,19 @@ function updateButtonVisibility(){
         withBallBtn.classList.toggle('active-toggle', activeArrow.dataset.withBall === 'true');
     }
 }
-field.addEventListener('touchstart', (e) => { if(!isDrawingMode && (e.target===field || e.target.classList.contains('field-svg-overlay'))) selectPlayer(null); });
-field.addEventListener('mousedown', (e) => { if(!isDrawingMode && (e.target===field || e.target.classList.contains('field-svg-overlay'))) selectPlayer(null); });
+/* Ein Tipp auf das leere Feld hebt die Auswahl auf - ausser bei Toren, Netzen
+   und Koerben. Dort wirkt die Zwei-Finger-Geste ueberall auf dem Feld, und die
+   braucht eine Auswahl, die beim ersten Finger nicht schon verschwindet.
+   Ein solcher Gegenstand bleibt gewaehlt, bis man ihn selbst antippt, ein
+   anderes Objekt waehlt oder die Zurueck-Taste drueckt. */
+function feldTippAbwahl(e){
+    if(isDrawingMode) return;
+    if(e.target !== field && !e.target.classList.contains('field-svg-overlay')) return;
+    if(activePlayer && activePlayer.classList.contains('item-obj')) return;
+    selectPlayer(null);
+}
+field.addEventListener('touchstart', feldTippAbwahl);
+field.addEventListener('mousedown', feldTippAbwahl);
 
 /* ---------------------------------------------------
    ANIMATION (Spielzüge abspielen)
@@ -2112,7 +2130,7 @@ const translations = {
         aboutTitle: 'Über TacticBoard',
         aboutText: `<strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
-        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen, dann lassen sie sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen - sie bleiben dann ausgewählt und lassen sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Ein erneuter Tipp darauf hebt die Auswahl auf. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
         <u>Trainingsgeräte & Tore:</u> Kurzes Tippen erstellt das zuletzt gewählte Gerät bzw. Tor – gedrückt halten öffnet die Auswahl (Plättchen, Stangen, Koordinationsleiter, Freistoßdummys bzw. Groß-, Klein- und Minitor). Plättchen und Stangen lassen sich wie Hütchen einfärben, Tore am ↻-Griff drehen. <br><br>
@@ -2232,7 +2250,7 @@ const translations = {
         aboutTitle: 'About TacticBoard',
         aboutText: `<strong>TacticBoard</strong> is a digital tactics board for coaches and players. <br><br>
         Place players, opponents, balls, goals and cones on dynamic fields (football, basketball, handball, volleyball, ice hockey) and draw movement paths and arrows. <br><br>
-        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: tap one, then pinch with two fingers anywhere on the field to resize and rotate it. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
+        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: tap one - it stays selected, and you can then pinch with two fingers anywhere on the field to resize and rotate it. Tapping it again clears the selection. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
         <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes.<br><br>
         <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. <br><br>
         <u>Training equipment & goals:</u> A short tap creates the last selected item – press and hold to open the selection (flat markers, poles, agility ladder, free-kick dummies, or full/small/mini goals). Flat markers and poles can be colored like cones, goals can be rotated using the ↻ handle. <br><br>
