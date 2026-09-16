@@ -444,7 +444,7 @@ body.landscape-fit .dev-credits { font-size:11px; }
     <div class="modal-text" id="about-text">
         <strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
-        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: mit zwei Fingern lassen sie sich aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen, dann lassen sie sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
         Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
@@ -965,11 +965,20 @@ clearDrawingsBtn.addEventListener('click', () => { pushCanvasHistory(); drawingS
 function getConeColor(sport){ return sport === 'basketball' ? '#2196f3' : getComputedStyle(document.documentElement).getPropertyValue('--cone-color').trim(); }
 
 /* Anzeige-Label fuer Spielerkreise: erster Vorname, hoechstens 6 Zeichen */
+/* Bis zu 7 Zeichen passen in den Spielerkreis - genug fuer "Milan A", wenn
+   zwei Spieler denselben Vornamen haben. Laengere Eingaben werden zu
+   Vorname plus Anfangsbuchstabe gekuerzt statt den Nachnamen einfach
+   wegzuwerfen: aus "Milan Alexander" wird "Milan A", nicht "Milan". */
+const LABEL_MAX = 7;
 function playerLabel(raw){
     const s = String(raw == null ? '' : raw).trim();
-    if(s.length <= 6) return s;
-    const first = s.split(/\s+/)[0];
-    return first.length <= 6 ? first : first.slice(0, 6);
+    if(s.length <= LABEL_MAX) return s;
+    const teile = s.split(/\s+/).filter(Boolean);
+    if(teile.length >= 2 && teile[1]){
+        const kurz = teile[0].slice(0, LABEL_MAX - 2) + ' ' + teile[1][0].toUpperCase();
+        if(kurz.length <= LABEL_MAX) return kurz;
+    }
+    return teile[0] ? teile[0].slice(0, LABEL_MAX) : '';
 }
 /* Schrift passend zur Labellaenge - vw-basiert, damit sie auf jedem
    Display und bei jeder Zoomstufe mitwaechst */
@@ -979,7 +988,8 @@ function applyLabelSize(el){
         : n === 3 ? 'clamp(7px, 2.5vw, 14px)'
         : n === 4 ? 'clamp(6px, 2.0vw, 12px)'
         : n === 5 ? 'clamp(5.5px, 1.7vw, 10px)'
-        : 'clamp(5px, 1.45vw, 9px)';
+        : n === 6 ? 'clamp(5px, 1.45vw, 9px)'
+        : 'clamp(4.5px, 1.25vw, 8px)';
 }
 
 function createObject(className, text, left, top, sizePercent, selectable, wPercent=null, hPercent=null, objColor=null, oid=null, variant=null, rotation=null){
@@ -1019,7 +1029,7 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
         el.dataset.variant = v;
         el.innerHTML = `<img class="item-img" src="data:image/svg+xml;utf8,${encodeURIComponent(itemSvg(v))}" /><div class="item-resize-handle">⤡</div><div class="item-rotate-handle">↻</div>`;
         if(rotation){ el.dataset.rotation = rotation; el.style.transform = 'rotate(' + rotation + 'deg)'; }
-        setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); setupItemPinch(el); field.appendChild(el);
+        setupPercentDrag(el, 14); setupItemResize(el); setupItemRotate(el); field.appendChild(el);
         // Erst nach dem Einhaengen: vorher liefert field.clientWidth im
         // Zweifel 0 und die Rechnung liefe ins Leere.
         itemKastenAnpassen(el);
@@ -1038,12 +1048,15 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
 }
 
 /* Zwei-Finger-Geste fuer Tore, Koerbe und Netze: aufziehen aendert die
-   Groesse, verdrehen dreht das Objekt. Das ist die Bedienung, die man vom
-   Betrachten von Fotos kennt - und sie trifft immer, im Gegensatz zu einem
-   Griff von 28 Pixeln auf einem flachen Tor.
+   Groesse, verdrehen dreht das Objekt.
+
+   Die Geste haengt am Spielfeld, nicht am Objekt. Auf dem Handy ist ein Tor
+   schmaler als zwei Finger - lag die Geste auf dem Objekt, war sie dort
+   faktisch nicht ausloesbar. Jetzt genuegt es, das Objekt auszuwaehlen;
+   danach wirken zwei Finger irgendwo auf dem Feld darauf.
    Griffe und Knopfzeile bleiben zusaetzlich bestehen. */
-function setupItemPinch(el){
-    let startAbstand = 0, startWinkel = 0, startBreite = 0, startDrehung = 0, aktiv = false;
+function setupFieldPinch(){
+    let ziel = null, startAbstand = 0, startWinkel = 0, startBreite = 0, startDrehung = 0, aktiv = false;
 
     function abstand(t){
         return Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
@@ -1053,14 +1066,14 @@ function setupItemPinch(el){
     }
 
     function bewege(ev){
-        if(!aktiv || !ev.touches || ev.touches.length < 2) return;
+        if(!aktiv || !ziel || !ev.touches || ev.touches.length < 2) return;
         if(ev.cancelable) ev.preventDefault();
-        const ar = itemAspect(el.dataset.variant || 'goal');
+        const ar = itemAspect(ziel.dataset.variant || 'goal');
 
         const faktor = abstand(ev.touches) / startAbstand;
         const w = Math.max(8, Math.min(90, startBreite * faktor));
-        el.style.width = w.toFixed(2) + '%';
-        el.style.height = (w * (field.clientWidth / field.clientHeight) / ar).toFixed(2) + '%';
+        ziel.style.width = w.toFixed(2) + '%';
+        ziel.style.height = (w * (field.clientWidth / field.clientHeight) / ar).toFixed(2) + '%';
 
         let rot = startDrehung + (winkel(ev.touches) - startWinkel);
         rot = ((rot % 360) + 360) % 360;
@@ -1068,22 +1081,26 @@ function setupItemPinch(el){
         // gerade wird, ohne dass die Drehung zaeh wirkt.
         const gerade = Math.round(rot / 90) * 90;
         if(Math.abs(rot - gerade) < 4) rot = gerade % 360;
-        el.dataset.rotation = rot;
-        el.style.transform = 'rotate(' + rot + 'deg)';
+        ziel.dataset.rotation = rot;
+        ziel.style.transform = 'rotate(' + rot + 'deg)';
     }
 
     function ende(ev){
         if(ev.touches && ev.touches.length >= 2) return;
-        aktiv = false;
+        aktiv = false; ziel = null;
         document.removeEventListener('touchmove', bewege);
         document.removeEventListener('touchend', ende);
         document.removeEventListener('touchcancel', ende);
     }
 
-    el.addEventListener('touchstart', ev => {
+    field.addEventListener('touchstart', ev => {
         if(ev.touches.length !== 2 || isDrawingMode || isAnimating) return;
+        // Nur wenn gerade ein Tor, Netz oder Korb ausgewaehlt ist. Spieler und
+        // Huetchen haben feste Groessen, dort soll die Geste nichts tun.
+        const el = activePlayer;
+        if(!el || !el.classList.contains('item-obj')) return;
         if(ev.cancelable) ev.preventDefault();
-        selectPlayer(el);
+        ziel = el;
         aktiv = true;
         startAbstand = abstand(ev.touches) || 1;
         startWinkel = winkel(ev.touches);
@@ -1094,6 +1111,7 @@ function setupItemPinch(el){
         document.addEventListener('touchcancel', ende);
     }, { passive: false });
 }
+setupFieldPinch();
 
 function setupItemResize(el) {
     const handle = el.querySelector('.item-resize-handle');
@@ -2094,7 +2112,7 @@ const translations = {
         aboutTitle: 'Über TacticBoard',
         aboutText: `<strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
-        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: mit zwei Fingern lassen sie sich aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
+        <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen, dann lassen sie sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
         <u>Trainingsgeräte & Tore:</u> Kurzes Tippen erstellt das zuletzt gewählte Gerät bzw. Tor – gedrückt halten öffnet die Auswahl (Plättchen, Stangen, Koordinationsleiter, Freistoßdummys bzw. Groß-, Klein- und Minitor). Plättchen und Stangen lassen sich wie Hütchen einfärben, Tore am ↻-Griff drehen. <br><br>
@@ -2213,7 +2231,7 @@ const translations = {
         aboutTitle: 'About TacticBoard',
         aboutText: `<strong>TacticBoard</strong> is a digital tactics board for coaches and players. <br><br>
         Place players, opponents, balls, goals and cones on dynamic fields (football, basketball, handball, volleyball, ice hockey) and draw movement paths and arrows. <br><br>
-        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: pinch with two fingers to resize and rotate them. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
+        <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: tap one, then pinch with two fingers anywhere on the field to resize and rotate it. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
         <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes.<br><br>
         <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. <br><br>
         <u>Training equipment & goals:</u> A short tap creates the last selected item – press and hold to open the selection (flat markers, poles, agility ladder, free-kick dummies, or full/small/mini goals). Flat markers and poles can be colored like cones, goals can be rotated using the ↻ handle. <br><br>
