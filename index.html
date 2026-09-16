@@ -2025,7 +2025,7 @@ exportGifBtn.addEventListener('click', async () => {
     drawFieldFrame(g, W, H, assets);
     gif.addFrame(frameCanvas, { copy: true, delay: 900 }); // Endbild etwas stehen lassen
     gif.on('finished', blob => {
-        dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Animation'), '.gif'), 'image/gif', true)
+        dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Animation'), '.gif'), 'image/gif', 'galerie')
             .then(wohin => showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgGifDone))
             .catch(err => { console.error('GIF-Export:', err); showToast(translations[LANG].msgShareError + ' (' + kurzFehler(err) + ')'); })
             .finally(() => { exportGifBtn.disabled = false; });
@@ -2165,6 +2165,7 @@ const translations = {
         fullscreenOn: 'Vollbild',
         fullscreenOff: 'Vollbild beenden',
         msgSavedToGallery: 'In der Galerie gespeichert (Bilder/TacticBoard).',
+        msgSavedToDownloads: 'Im Ordner Downloads/TacticBoard gespeichert.',
         msgImageSaved: 'Bild erstellt.',
         exportBtn: '📤 Export',
         importBtn: '📥 Import',
@@ -2284,6 +2285,7 @@ const translations = {
         fullscreenOn: 'Full screen',
         fullscreenOff: 'Exit full screen',
         msgSavedToGallery: 'Saved to your gallery (Pictures/TacticBoard).',
+        msgSavedToDownloads: 'Saved to Downloads/TacticBoard.',
         msgImageSaved: 'Image created.',
         exportBtn: '📤 Export',
         importBtn: '📥 Import',
@@ -2989,14 +2991,21 @@ function kurzFehler(e){
     return String(t).replace(/\s+/g, ' ').slice(0, 60);
 }
 
-async function dateiSichern(blob, name, mimeTyp, inGalerie){
+/* modus: 'galerie'   -> Bilder und GIFs nach Bilder/TacticBoard
+          'downloads' -> Dateien nach Downloads/TacticBoard
+          sonst        -> Teilen-Menue */
+async function dateiSichern(blob, name, mimeTyp, modus){
     if(window.TbShare && window.TbShare.shareFile){
         const b64 = await blobZuBase64(blob);
-        // Bilder und GIFs gehoeren in die Galerie - "Als Bild speichern" soll
-        // speichern, nicht ein Teilen-Menue oeffnen. Vor Android 10 faellt das
-        // Plugin selbst auf das Teilen-Menue zurueck und liefert ''.
-        if(inGalerie && window.TbShare.saveImage){
+        // Ein ACTION_SEND-Intent bietet nur Apps an, die Dateien entgegennehmen -
+        // "in Dateien speichern" ist dort meist nicht dabei. Deshalb legen wir
+        // selbst ab. Vor Android 10 faellt das Plugin auf das Teilen-Menue
+        // zurueck und liefert ''.
+        if(modus === 'galerie' && window.TbShare.saveImage){
             return await window.TbShare.saveImage(name, mimeTyp, b64) ? 'galerie' : '';
+        }
+        if(modus === 'downloads' && window.TbShare.saveFile){
+            return await window.TbShare.saveFile(name, mimeTyp, b64) ? 'downloads' : '';
         }
         await window.TbShare.shareFile(name, mimeTyp, b64);
         return '';
@@ -3038,8 +3047,10 @@ exportTacticsBtn.addEventListener('click', () => {
     const payload = { app: 'TacticBoard', version: 1, tactics: chosen };
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     const rawName = chosen.length === 1 ? chosen[0].name : 'Alle_Taktiken';
-    dateiSichern(blob, dateiname('TacticBoard_' + rawName, '.json'), 'application/json')
-        .then(() => showToast(chosen.length === 1 ? translations[LANG].msgExportedOne : translations[LANG].msgExportedAll))
+    dateiSichern(blob, dateiname('TacticBoard_' + rawName, '.json'), 'application/json', 'downloads')
+        .then(wohin => showToast(wohin === 'downloads'
+            ? translations[LANG].msgSavedToDownloads
+            : (chosen.length === 1 ? translations[LANG].msgExportedOne : translations[LANG].msgExportedAll)))
         .catch(err => { console.error('Export:', err); showToast(translations[LANG].msgShareError + ' (' + kurzFehler(err) + ')'); });
 });
 /* ---- Pruefung importierter Taktikdateien ----------------------------
@@ -3177,7 +3188,7 @@ exportImgBtn.addEventListener('click', () => {
                 canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob lieferte null')), 'image/png');
             });
         }).then(blob => {
-            return dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Board'), '.png'), 'image/png', true);
+            return dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Board'), '.png'), 'image/png', 'galerie');
         }).then(wohin => {
             showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgImageSaved);
         }).catch(err => {
