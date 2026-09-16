@@ -39,7 +39,8 @@ public class TbShare extends CordovaPlugin {
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext)
             throws JSONException {
         final boolean inGalerie = "saveImage".equals(action);
-        if (!inGalerie && !"shareFile".equals(action)) {
+        final boolean inDownloads = "saveFile".equals(action);
+        if (!inGalerie && !inDownloads && !"shareFile".equals(action)) {
             return false;
         }
 
@@ -50,7 +51,15 @@ public class TbShare extends CordovaPlugin {
         cordova.getThreadPool().execute(() -> {
             try {
                 if (inGalerie && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    callbackContext.success(inGalerieSichern(dateiname, mimeTyp, base64));
+                    callbackContext.success(inMediaStoreSichern(
+                            dateiname, mimeTyp, base64,
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                            Environment.DIRECTORY_PICTURES + "/TacticBoard"));
+                } else if (inDownloads && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    callbackContext.success(inMediaStoreSichern(
+                            dateiname, mimeTyp, base64,
+                            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                            Environment.DIRECTORY_DOWNLOADS + "/TacticBoard"));
                 } else {
                     // Vor Android 10 braeuchte das Schreiben in die Galerie eine
                     // Speicher-Berechtigung. Die wollen wir nicht anfragen, also
@@ -131,19 +140,20 @@ public class TbShare extends CordovaPlugin {
     }
 
     /**
-     * Legt das Bild ueber den MediaStore in Bilder/TacticBoard ab. Ab Android 10
-     * ist dafuer keine Berechtigung noetig, und die Galerie findet es sofort.
+     * Legt eine Datei ueber den MediaStore ab - Bilder unter Bilder/TacticBoard,
+     * Taktikdateien unter Downloads/TacticBoard. Ab Android 10 ist dafuer keine
+     * Berechtigung noetig, und Galerie beziehungsweise Dateimanager finden sie
+     * sofort.
      *
      * @return der angezeigte Ordner, fuer die Rueckmeldung an den Nutzer
      */
-    private String inGalerieSichern(String dateiname, String mimeTyp, String base64)
-            throws Exception {
+    private String inMediaStoreSichern(String dateiname, String mimeTyp, String base64,
+                                       Uri sammlung, String ordner) throws Exception {
         byte[] daten = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
         if (daten.length == 0) {
             throw new IllegalStateException("Leere Datei - Base64 konnte nicht dekodiert werden");
         }
 
-        String ordner = Environment.DIRECTORY_PICTURES + "/TacticBoard";
         ContentResolver resolver = cordova.getActivity().getContentResolver();
 
         ContentValues werte = new ContentValues();
@@ -152,7 +162,7 @@ public class TbShare extends CordovaPlugin {
         werte.put(MediaStore.MediaColumns.RELATIVE_PATH, ordner);
         werte.put(MediaStore.MediaColumns.IS_PENDING, 1);
 
-        Uri ziel = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, werte);
+        Uri ziel = resolver.insert(sammlung, werte);
         if (ziel == null) {
             throw new IllegalStateException("MediaStore lieferte keinen Eintrag");
         }
@@ -162,7 +172,7 @@ public class TbShare extends CordovaPlugin {
             }
             out.write(daten);
         } catch (Exception e) {
-            // Halbfertigen Eintrag nicht in der Galerie zuruecklassen
+            // Halbfertigen Eintrag nicht zuruecklassen
             resolver.delete(ziel, null, null);
             throw e;
         }
