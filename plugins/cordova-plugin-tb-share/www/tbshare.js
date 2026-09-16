@@ -22,5 +22,13 @@ module.exports = {
         return new Promise(function (resolve, reject) {
             exec(resolve, reject, 'TbShare', 'saveImage', [dateiname, mimeTyp, base64]);
         });
+    },
+
+    /** Legt eine Datei im Ordner Downloads/TacticBoard ab, wo jeder
+     *  Dateimanager sie findet. Vor Android 10 Rueckfall auf das Teilen-Menue. */
+    saveFile: function (dateiname, mimeTyp, base64) {
+        return new Promise(function (resolve, reject) {
+            exec(resolve, reject, 'TbShare', 'saveFile', [dateiname, mimeTyp, base64]);
+        });
     }
 };
