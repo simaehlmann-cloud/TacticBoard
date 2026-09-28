@@ -1,0 +1,382 @@
+# =====================================================================
+# TacticBoard - iOS-Build fuer den App Store (iPhone und iPad)
+#
+# Aufbau nach dem Vorbild von FairMix/.github/workflows/ios.yml.
+#
+# Was passiert wann:
+#   - Jeder Push auf main: baut die App (unsigniert UND signiert) zur
+#     Kontrolle. Es wird NICHTS zu Apple hochgeladen.
+#   - Manueller Start (Actions -> "Build TacticBoard (iOS)" -> Run workflow):
+#     baut und laedt zusaetzlich nach App Store Connect hoch.
+#     Jede hochgeladene Build-Nummer ist bei Apple dauerhaft verbraucht -
+#     deshalb nur auf Knopfdruck.
+#
+# Versionen:
+#   - Sichtbare Version (2.2.0 ...) = version="..." in config.xml.
+#     Muss in App Store Connect bei der Version genauso eingetragen sein.
+#   - Build-Nummer = fortlaufende Laufnummer dieses Workflows. Steigt bei
+#     jedem Lauf automatisch; von Hand ist nichts zu tun.
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   IOS_CERTIFICATE_P12_BASE64   Distributionszertifikat samt Schluessel (.p12, base64)
+#   IOS_CERTIFICATE_PASSWORD     Passwort dieser .p12
+#   IOS_PROVISIONING_PROFILE     App-Store-Profil fuer de.tacticboard.app (base64)
+#   IOS_TEAM_ID                  zehnstellige Team-ID
+#   IOS_SIGNING_IDENTITY         "Apple Distribution: <Name> (<Team-ID>)", zeichengenau
+#   ASC_KEY_ID                   App-Store-Connect-API: Schluessel-ID
+#   ASC_ISSUER_ID                App-Store-Connect-API: Aussteller-ID
+#   ASC_KEY_P8                   Inhalt der AuthKey_<ID>.p8, samt BEGIN/END-Zeilen
+# =====================================================================
+
+name: Build TacticBoard (iOS)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Festgepinnt statt macos-latest: "latest" wandert ohne Vorwarnung auf
+    # eine neue Xcode-Fassung. Apple verlangt seit 28.04.2026 Xcode 26 /
+    # iOS-26-SDK; jedes Fruehjahr kommt eine neue Pflichtfassung dazu.
+    runs-on: macos-26
+
+    env:
+      APP_ID: de.tacticboard.app
+      APP_NAME: TacticBoard
+      CORDOVA_CLI: '13.0.0'
+      CORDOVA_IOS: '8.1.1'
+      # Dieselben Plugin-Fassungen, mit denen FairMix im Store laeuft.
+      # Sie werden NUR hier eingebunden, nicht in config.xml - so bleibt
+      # der Android-Build unberuehrt.
+      PLUGIN_TEILEN: 'cordova-plugin-x-socialsharing@6.0.4'
+      PLUGIN_STATUSLEISTE: 'cordova-plugin-statusbar@4.0.0'
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+
+      - name: Node einrichten
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # Apple nimmt Uploads nur an, wenn sie mit einem hinreichend neuen SDK
+      # gebaut wurden. Diese Zeile ist der Ort, an dem das jaehrlich
+      # nachgezogen wird (bei FairMix gleichzeitig).
+      - name: Xcode auswählen
+        run: |
+          set -e
+          ls /Applications | grep -i '^Xcode' || true
+          APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$APP" ] || { echo "::error::Kein Xcode 26 auf diesem Laeufer gefunden."; exit 1; }
+          sudo xcode-select -switch "$APP"
+          xcodebuild -version
+
+      - name: Icons und Startbild erzeugen
+        run: |
+          set -e
+          python3 -m pip install --quiet --break-system-packages Pillow || pip3 install --quiet Pillow
+          python3 tools/make_ios_icons.py
+
+      - name: Cordova installieren
+        run: npm install -g "cordova@${CORDOVA_CLI}"
+
+      - name: Cordova-Projekt aufbauen
+        run: |
+          set -euo pipefail
+          cordova create build "$APP_ID" "$APP_NAME"
+          cp config.xml build/config.xml
+
+          # Build-Nummer = Laufnummer. Steigt bei jedem Lauf, auch bei
+          # abgebrochenen - Luecken sind fuer Apple kein Problem, nur
+          # Wiederholungen.
+          python3 - "$GITHUB_RUN_NUMBER" <<'PYEOF'
+          import re, sys
+          nummer = sys.argv[1]
+          pfad = 'build/config.xml'
+          s = open(pfad, encoding='utf-8').read()
+          s = re.sub(r'\s+ios-CFBundleVersion="[^"]*"', '', s)
+          neu, n = re.subn(r'<widget ', '<widget ios-CFBundleVersion="%s" ' % nummer, s, count=1)
+          if n != 1:
+              sys.exit('FEHLER: <widget> nicht gefunden')
+          open(pfad, 'w', encoding='utf-8').write(neu)
+          print('Build-Nummer gesetzt:', nummer)
+          PYEOF
+
+          mkdir -p build/res
+          cp -r res/ios build/res/ios
+
+          rm -rf build/www/*
+          cp index.html manifest.json sw.js image.png icon_maskable.png build/www/
+          cp datenschutz.html impressum.html datenschutz-en.html impressum-en.html build/www/
+
+          echo "--- Kontrolle: was hier steht, landet im Store ---"
+          grep -o '<widget[^>]*>' build/config.xml | tr ' ' '\n' | grep -E 'id=|version=|CFBundleVersion'
+
+      # Wie im Android-Build: die App bekommt eine strenge CSP ohne CDN.
+      # In der App liegen die Bibliotheken im Paket; eine Offline-Kauf-App
+      # baut von sich aus keine Verbindung nach aussen auf.
+      - name: App-Fassung haerten
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import re, sys
+          pfad = 'build/www/index.html'
+          s = open(pfad, encoding='utf-8').read()
+          streng = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+                    "connect-src 'self' data: blob:; worker-src 'self' blob:; "
+                    "child-src 'self' blob:; font-src 'self'; object-src 'none'; "
+                    "base-uri 'self'; form-action 'none'")
+          neu, n = re.subn(r'(<meta http-equiv="Content-Security-Policy" content=")[^"]*(")',
+                           lambda m: m.group(1) + streng + m.group(2), s, count=1)
+          if n != 1:
+              sys.exit('FEHLER: CSP-Meta-Tag nicht gefunden - index.html veraendert?')
+          open(pfad, 'w', encoding='utf-8').write(neu)
+          print('CSP der App-Fassung verschaerft.')
+          PYEOF
+          if grep -o 'Content-Security-Policy[^>]*' build/www/index.html | grep -q cdnjs; then
+            echo "::error::cdnjs steht noch in der CSP der App-Fassung."
+            exit 1
+          fi
+
+      - name: Export-Bibliotheken laden und pruefen
+        run: |
+          set -euo pipefail
+          mkdir -p build/www/libs
+          cd build/www/libs
+          curl -sSfL --proto '=https' --tlsv1.2 -o html2canvas.min.js \
+            https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
+          curl -sSfL --proto '=https' --tlsv1.2 -o gif.js \
+            https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js
+          curl -sSfL --proto '=https' --tlsv1.2 -o gif.worker.js \
+            https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js
+          if [ -f "$GITHUB_WORKSPACE/libs.sha256" ]; then
+            shasum -a 256 -c "$GITHUB_WORKSPACE/libs.sha256" \
+              || { echo "::error::Eine Bibliothek weicht von der hinterlegten Pruefsumme ab."; exit 1; }
+            echo "Alle Bibliotheken unveraendert."
+          else
+            echo "::warning::Keine libs.sha256 im Repo - Bibliotheken ungeprueft."
+          fi
+
+      - name: iOS-Plattform und Plugins hinzufügen
+        working-directory: build
+        run: |
+          set -euo pipefail
+          cordova platform add "ios@${CORDOVA_IOS}" --no-telemetry
+          cordova plugin add "$PLUGIN_TEILEN" --no-telemetry
+          cordova plugin add "$PLUGIN_STATUSLEISTE" --no-telemetry
+          # Das eigene Teilen-Plugin (plugins/cordova-plugin-tb-share) ist
+          # reines Android und wird hier bewusst nicht eingebunden.
+          cordova plugin ls
+          # Nach dem Hinzufuegen der Plugins neu vorbereiten, damit deren
+          # Info.plist-Eintraege VOR unseren edit-config-Texten stehen und
+          # von diesen ueberschrieben werden.
+          cordova prepare ios --no-telemetry
+
+      # Die config.xml erklaert nur die Absicht. Was Xcode wirklich baut,
+      # steht in der erzeugten Info.plist - und genau daran scheitert der
+      # Upload, wenn es nicht stimmt.
+      - name: Erzeugtes Projekt bestätigen
+        working-directory: build
+        run: |
+          set -e
+          PLIST=$(find platforms/ios -maxdepth 3 -name '*-Info.plist' | head -1)
+          [ -n "$PLIST" ] || { echo "::error::Keine Info.plist im erzeugten Projekt gefunden."; exit 1; }
+          echo "--- Info.plist: $PLIST ---"
+
+          holen() {
+            /usr/libexec/PlistBuddy -c "Print :$1" "$PLIST" 2>/dev/null || echo "FEHLT"
+          }
+
+          # cordova-ios 8 traegt in die Info.plist nur $(PRODUCT_BUNDLE_IDENTIFIER)
+          # ein; der Wert steht dann in der Projektdatei.
+          BUNDLE=$(holen CFBundleIdentifier)
+          case "$BUNDLE" in
+            FEHLT|*'$('*)
+              PBX=$(find platforms/ios -name project.pbxproj | head -1)
+              if [ -n "$PBX" ]; then
+                BUNDLE=$(grep -m1 -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*;' "$PBX" \
+                         | sed 's/.*= *//; s/;$//; s/^"//; s/"$//')
+              fi
+              [ -n "$BUNDLE" ] || BUNDLE=FEHLT
+              ;;
+          esac
+          VERSION=$(holen CFBundleShortVersionString)
+          BUILDNR=$(holen CFBundleVersion)
+          case "$VERSION" in *'$('*) VERSION=$(grep -m1 -o 'MARKETING_VERSION = [^;]*;' $(find platforms/ios -name project.pbxproj | head -1) | sed 's/.*= *//; s/;$//');; esac
+          case "$BUILDNR" in *'$('*) BUILDNR=$(grep -m1 -o 'CURRENT_PROJECT_VERSION = [^;]*;' $(find platforms/ios -name project.pbxproj | head -1) | sed 's/.*= *//; s/;$//');; esac
+          KRYPTO=$(holen ITSAppUsesNonExemptEncryption)
+          FOTOS=$(holen NSPhotoLibraryAddUsageDescription)
+          FOTOS_LESEN=$(holen NSPhotoLibraryUsageDescription)
+          GERAETE=$(grep -m1 -o 'TARGETED_DEVICE_FAMILY = [^;]*;' $(find platforms/ios -name project.pbxproj | head -1) | sed 's/.*= *//; s/;$//; s/"//g')
+
+          echo "Bundle-ID:        $BUNDLE"
+          echo "Version:          $VERSION"
+          echo "Build-Nummer:     $BUILDNR"
+          echo "Geraete:          $GERAETE   (1 = iPhone, 2 = iPad)"
+          echo "Export-Erklärung: $KRYPTO"
+          echo "Foto-Hinweis:     $FOTOS"
+          echo "Foto-Lesen-Text:  $FOTOS_LESEN"
+
+          FEHLER=0
+          [ "$BUNDLE" = "$APP_ID" ] || { echo "::error::Bundle-ID ist '$BUNDLE', erwartet '$APP_ID'."; FEHLER=1; }
+          [ "$KRYPTO" = "false" ]  || { echo "::error::ITSAppUsesNonExemptEncryption fehlt."; FEHLER=1; }
+          [ "$FOTOS" != "FEHLT" ]  || { echo "::error::NSPhotoLibraryAddUsageDescription fehlt - 'Bild sichern' beendet die App."; FEHLER=1; }
+          case "$FOTOS_LESEN" in
+            *"requires photo library access"*) echo "::error::Platzhaltertext des Plugins in NSPhotoLibraryUsageDescription - Apple weist das ab."; FEHLER=1;;
+          esac
+          case "$GERAETE" in
+            *2*) ;;
+            *) echo "::error::Die App ist nicht fuer das iPad freigegeben (TARGETED_DEVICE_FAMILY=$GERAETE)."; FEHLER=1;;
+          esac
+
+          # cordova-ios 8 legt selbst ein PrivacyInfo.xcprivacy an, aber mit
+          # leerem NSPrivacyAccessedAPITypes. Unseres ersetzt es an Ort und
+          # Stelle - zwei Manifeste waeren mehrdeutig.
+          MANIFESTE=$(find platforms/ios -name PrivacyInfo.xcprivacy -not -path '*/Pods/*' | wc -l | tr -d ' ')
+          echo "Privacy-Manifeste im Projekt: $MANIFESTE"
+          if [ "$MANIFESTE" -eq 0 ]; then
+            echo "::error::Kein PrivacyInfo.xcprivacy im Projekt."
+            FEHLER=1
+          else
+            for M in $(find platforms/ios -name PrivacyInfo.xcprivacy -not -path '*/Pods/*'); do
+              case "$M" in *cordova-plugin-*) continue;; esac
+              if ! grep -q 'CA92.1' "$M"; then
+                echo "Ersetze mitgeliefertes Manifest: $M"
+                cp ../tools/PrivacyInfo.xcprivacy "$M"
+              fi
+            done
+          fi
+
+          exit $FEHLER
+
+      # Ohne Zertifikat laeuft trotzdem ein Build - er beweist, dass das
+      # Projekt uebersetzt. Nur hochladen laesst er sich nicht.
+      - name: Unsigniert bauen (Kompilierbarkeit nachweisen)
+        working-directory: build
+        run: cordova build ios --debug --emulator --no-telemetry
+
+      # ---- Signierter Build für den App Store ----
+      - name: Signierschlüssel einrichten
+        id: signieren
+        env:
+          ZERT_B64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          ZERT_PW: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFIL_B64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          set -e
+          if [ -z "$ZERT_B64" ] || [ -z "$PROFIL_B64" ]; then
+            echo "vorhanden=false" >> "$GITHUB_OUTPUT"
+            echo "Kein Zertifikat hinterlegt – signierter Build wird übersprungen."
+            exit 0
+          fi
+
+          # Unsichtbare Zeichen entfernen, die beim Kopieren mitkommen koennen.
+          saeubern() {
+            printf '%s' "$1" | sed '1s/^\xEF\xBB\xBF//' | tr -d ' \t\r\n' | base64 -d
+          }
+
+          ZERT="$RUNNER_TEMP/dist.p12"
+          PROFIL="$RUNNER_TEMP/profil.mobileprovision"
+          saeubern "$ZERT_B64"   > "$ZERT"
+          saeubern "$PROFIL_B64" > "$PROFIL"
+          [ -s "$ZERT" ]   || { echo "::error::Das Zertifikat ließ sich nicht dekodieren."; exit 1; }
+          [ -s "$PROFIL" ] || { echo "::error::Das Profil ließ sich nicht dekodieren."; exit 1; }
+
+          # Pruefen, dass das Profil wirklich zu TacticBoard gehoert - ein
+          # versehentlich eingefuegtes FairMix-Profil faellt sonst erst beim
+          # Signieren mit einer unverstaendlichen Meldung auf.
+          PROFIL_PLIST="$RUNNER_TEMP/profil.plist"
+          security cms -D -i "$PROFIL" > "$PROFIL_PLIST"
+          PROFIL_APP=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFIL_PLIST")
+          PROFIL_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFIL_PLIST")
+          PROFIL_ENDE=$(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$PROFIL_PLIST")
+          echo "Profil: $PROFIL_NAME  ($PROFIL_APP), gültig bis $PROFIL_ENDE"
+          case "$PROFIL_APP" in
+            *".$APP_ID") ;;
+            *) echo "::error::Das Profil gehört zu '$PROFIL_APP', nicht zu $APP_ID. Secret IOS_PROVISIONING_PROFILE prüfen."; exit 1;;
+          esac
+
+          BUND="$RUNNER_TEMP/signieren.keychain-db"
+          BUND_PW=$(uuidgen)
+          security create-keychain -p "$BUND_PW" "$BUND"
+          security set-keychain-settings -lut 21600 "$BUND"
+          security unlock-keychain -p "$BUND_PW" "$BUND"
+          security import "$ZERT" -P "$ZERT_PW" -A -t cert -f pkcs12 -k "$BUND" \
+            || { echo "::error::Zertifikat-Import fehlgeschlagen. Stimmt IOS_CERTIFICATE_PASSWORD?"; exit 1; }
+          security set-key-partition-list -S apple-tool:,apple: -k "$BUND_PW" "$BUND" > /dev/null
+          security list-keychain -d user -s "$BUND" login.keychain-db
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFIL_PLIST")
+          cp "$PROFIL" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "Profil installiert: $UUID"
+
+          rm -f "$ZERT" "$PROFIL" "$PROFIL_PLIST"
+          echo "profil_uuid=$UUID" >> "$GITHUB_OUTPUT"
+          echo "vorhanden=true" >> "$GITHUB_OUTPUT"
+
+      - name: Signiert bauen (IPA für den App Store)
+        if: steps.signieren.outputs.vorhanden == 'true'
+        working-directory: build
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IDENTITAET: ${{ secrets.IOS_SIGNING_IDENTITY }}
+          PROFIL_UUID: ${{ steps.signieren.outputs.profil_uuid }}
+        run: |
+          set -euo pipefail
+          # jq escaped die Werte korrekt (Umlaut im Namen, Doppelpunkt, Klammern).
+          jq -n \
+            --arg id "$IDENTITAET" --arg team "$TEAM_ID" --arg profil "$PROFIL_UUID" \
+            '{ios:{release:{codeSignIdentity:$id, developmentTeam:$team, provisioningProfile:$profil, packageType:"app-store", automaticProvisioning:false}}}' \
+            > build.json
+          cordova build ios --release --device --buildConfig=build.json --no-telemetry
+          rm -f build.json
+
+      - name: IPA hochladen (Artefakt)
+        if: steps.signieren.outputs.vorhanden == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: TacticBoard-ios-ipa
+          path: build/platforms/ios/build/**/*.ipa
+          if-no-files-found: error
+
+      # ---- Upload nach App Store Connect (nur bei manuellem Start) ----
+      - name: In App Store Connect hochladen
+        if: steps.signieren.outputs.vorhanden == 'true' && github.event_name == 'workflow_dispatch'
+        working-directory: build
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -e
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_KEY_P8" ]; then
+            echo "::warning::Keine App-Store-Connect-Schlüssel hinterlegt – Upload übersprungen. Die IPA liegt als Artefakt bereit."
+            exit 0
+          fi
+
+          # altool sucht den Schluessel genau hier, unter genau diesem Namen.
+          mkdir -p "$HOME/private_keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+          IPA=$(find platforms/ios/build -name '*.ipa' | head -1)
+          [ -n "$IPA" ] || { echo "::error::Keine IPA gefunden."; exit 1; }
+          echo "Lade hoch: $IPA"
+
+          # Erst pruefen, dann senden: der Pruefschritt findet Fehler, bevor
+          # eine Build-Nummer verbraucht ist.
+          xcrun altool --validate-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+          rm -f "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "Hochgeladen. Die Verarbeitung in App Store Connect dauert 5–30 Minuten." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Schlüsselbund entfernen
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signieren.keychain-db" 2>/dev/null || true
