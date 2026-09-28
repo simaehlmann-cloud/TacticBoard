@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy-Manifest fuer TacticBoard (iOS).
+
+  Apple verlangt diese Datei. Ohne sie weist App Store Connect den Upload
+  zurueck - erst nach der Verarbeitung, dann ist die Build-Nummer verbraucht.
+
+  Der Inhalt bildet das tatsaechliche Verhalten ab: TacticBoard erhebt
+  nichts, sendet nichts und trackt nicht. Taktiken bleiben auf dem Geraet.
+  Das deckt sich mit der Datenschutzerklaerung und den Angaben in
+  App Store Connect ("Keine Daten erfasst").
+
+  Einziger meldepflichtiger Zugriff: UserDefaults, in denen Cordova eigene
+  Einstellungen ablegt. Grund CA92.1 = nur Daten des eigenen App-Containers.
+
+  Liegt bewusst unter tools/ und nicht unter res/ios/ - res/ios/ wird
+  bei jedem Build neu erzeugt und steht in der .gitignore.
+
+  Der Workflow ios.yml ersetzt damit das leere Manifest, das cordova-ios
+  selbst anlegt (Schritt "Erzeugtes Projekt bestaetigen").
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
