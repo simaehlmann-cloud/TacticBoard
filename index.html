@@ -302,6 +302,47 @@ body.landscape-fit .dev-credits { font-size:11px; }
 /* TOAST NOTIFICATION */
 #toast { visibility: hidden; min-width: 250px; background-color: #2a9d8f; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s, bottom 0.3s ease-out; box-shadow: 0 4px 12px rgba(0,0,0,0.4); font-weight: bold; }
 #toast.show { visibility: visible; opacity: 1; bottom: 80px; }
+
+/* SAFE AREA (iPhone mit Notch/Dynamic Island, Home-Leiste; iPad)
+   Der Viewport reicht dank viewport-fit=cover bis an die Geraeteraender.
+   env(safe-area-inset-*) ist auf allen anderen Geraeten und im Browser 0 -
+   dort aendert sich nichts. Steht bewusst am Ende, damit diese Regeln die
+   Grundwerte weiter oben ueberschreiben. */
+.header {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-left: calc(16px + env(safe-area-inset-left, 0px));
+    padding-right: calc(16px + env(safe-area-inset-right, 0px));
+}
+.container {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+}
+#toast.show { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+.modal-overlay {
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+             env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    box-sizing: border-box;
+}
+body.fullscreen-board .container { padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+body.landscape-fit .header {
+    padding-top: calc(4px + env(safe-area-inset-top, 0px));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+}
+body.landscape-fit .container {
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+}
+body.landscape-fit footer {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+}
 </style>
 </head>
 <body>
@@ -523,8 +564,8 @@ body.landscape-fit .dev-credits { font-size:11px; }
 
 <div id="toast">Nachricht</div>
 
-<!-- Wird nur im Android-Build von Cordova bereitgestellt. In der Web-Version
-     ist die Datei nicht vorhanden; das ist ohne Folgen. -->
+<!-- Wird nur in den App-Builds (Android und iOS) von Cordova bereitgestellt.
+     In der Web-Version ist die Datei nicht vorhanden; das ist ohne Folgen. -->
 <script src="cordova.js"></script>
 
 <script>
@@ -694,14 +735,23 @@ function fitFieldToScreen(){
     const footerH = (footerEl && !landscape) ? footerEl.offsetHeight : 0;
     const setupH  = setupEl  ? setupEl.offsetHeight  : 60;
 
+    /* Seitliche Aussparungen (iPhone im Querformat: Notch links oder rechts).
+       Gemessen ueber die echten Innenabstaende des Containers - die enthalten
+       den Mindestrand und die Safe Area zugleich. */
+    const contEl = document.querySelector('.container');
+    const contCS = contEl ? getComputedStyle(contEl) : null;
+    const seitenRand = contCS
+        ? (parseFloat(contCS.paddingLeft) || 0) + (parseFloat(contCS.paddingRight) || 0)
+        : (landscape ? 24 : 32);
+
     let availH, maxW;
     if(landscape){
         /* Fusszeile ist im Querformat nicht fixiert und kostet keine Hoehe. */
         availH = vh - headerH - 26;
-        maxW = Math.min(availH * FIELD_RATIO, vw - 24);
+        maxW = Math.min(availH * FIELD_RATIO, vw - seitenRand);
     } else {
         availH = vh - headerH - footerH - setupH - 48;
-        maxW = Math.min(availH * FIELD_RATIO, vw - 32);
+        maxW = Math.min(availH * FIELD_RATIO, vw - seitenRand);
     }
     maxW = Math.max(FIELD_MIN_W, Math.min(FIELD_MAX_W, Math.round(maxW)));
     document.documentElement.style.setProperty('--field-max-w', maxW + 'px');
@@ -2037,7 +2087,7 @@ exportGifBtn.addEventListener('click', async () => {
     gif.addFrame(frameCanvas, { copy: true, delay: 900 }); // Endbild etwas stehen lassen
     gif.on('finished', blob => {
         dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Animation'), '.gif'), 'image/gif', 'galerie')
-            .then(wohin => showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgGifDone))
+            .then(wohin => { if(wohin !== 'abbruch') showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgGifDone); })
             .catch(err => { console.error('GIF-Export:', err); showToast(translations[LANG].msgShareError + ' (' + kurzFehler(err) + ')'); })
             .finally(() => { exportGifBtn.disabled = false; });
     });
@@ -2964,8 +3014,14 @@ importPasteBtn.addEventListener('click', async () => {
    das download-Attribut. In beiden Apps passierte beim Export deshalb
    schlicht nichts. Reihenfolge:
      1. Android-App -> eigenes Plugin (window.TbShare)
-     2. iOS         -> navigator.share mit Datei
-     3. Browser     -> klassischer Download
+     2. iOS-App     -> Teilen-Menue ueber cordova-plugin-x-socialsharing
+                       (wird nur im iOS-Build eingebunden, siehe ios.yml)
+     3. iOS-Safari  -> navigator.share mit Datei
+     4. Browser     -> klassischer Download
+
+   Rueckgabe: 'galerie' / 'downloads' = direkt abgelegt (Android),
+              'abbruch' = Nutzer hat das Teilen-Menue geschlossen,
+              ''        = weitergegeben bzw. heruntergeladen.
 --------------------------------------------------- */
 const IST_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -3002,6 +3058,15 @@ function kurzFehler(e){
     return String(t).replace(/\s+/g, ' ').slice(0, 60);
 }
 
+/* Ankerpunkt fuer das Teilen-Menue auf dem iPad. Dort ist es ein Popover
+   und braucht eine Position - ohne Angabe beendet UIKit die App.
+   Mittig im unteren Drittel, im sichtbaren Bereich. */
+function iPadTeilenAnker(){
+    const x = Math.max(0, Math.round(window.innerWidth / 2));
+    const y = Math.max(0, Math.round(window.innerHeight * 0.66));
+    return x + ',' + y + ',0,0';
+}
+
 /* modus: 'galerie'   -> Bilder und GIFs nach Bilder/TacticBoard
           'downloads' -> Dateien nach Downloads/TacticBoard
           sonst        -> Teilen-Menue */
@@ -3021,17 +3086,31 @@ async function dateiSichern(blob, name, mimeTyp, modus){
         await window.TbShare.shareFile(name, mimeTyp, b64);
         return '';
     }
+    const teilen = window.plugins && window.plugins.socialsharing;
+    if(window.cordova && teilen && teilen.shareWithOptions){
+        // Das Menue bietet je nach Dateityp "Bild sichern" (Fotos) oder
+        // "In Dateien sichern" an - Galerie und Downloads zugleich.
+        const dataUrl = 'data:' + mimeTyp + ';base64,' + await blobZuBase64(blob);
+        return await new Promise((resolve, reject) => {
+            teilen.shareWithOptions(
+                { subject: name, files: [dataUrl], chooserTitle: name,
+                  iPadPopupCoordinates: iPadTeilenAnker() },
+                ergebnis => resolve(ergebnis && ergebnis.completed === false ? 'abbruch' : ''),
+                fehler => reject(new Error(String(fehler || 'Teilen')))
+            );
+        });
+    }
     if(IST_IOS && navigator.canShare){
         try {
             const datei = new File([blob], name, { type: mimeTyp });
             if(navigator.canShare({ files: [datei] })){
                 await navigator.share({ files: [datei] });
-                return;
+                return '';
             }
         } catch(e){
             // Abbruch durch den Nutzer ist kein Fehler - dann nicht zusaetzlich
             // noch einen Download ausloesen.
-            if(e && e.name === 'AbortError') return;
+            if(e && e.name === 'AbortError') return 'abbruch';
         }
     }
     const url = URL.createObjectURL(blob);
@@ -3059,9 +3138,9 @@ exportTacticsBtn.addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     const rawName = chosen.length === 1 ? chosen[0].name : 'Alle_Taktiken';
     dateiSichern(blob, dateiname('TacticBoard_' + rawName, '.json'), 'application/json', 'downloads')
-        .then(wohin => showToast(wohin === 'downloads'
+        .then(wohin => { if(wohin !== 'abbruch') showToast(wohin === 'downloads'
             ? translations[LANG].msgSavedToDownloads
-            : (chosen.length === 1 ? translations[LANG].msgExportedOne : translations[LANG].msgExportedAll)))
+            : (chosen.length === 1 ? translations[LANG].msgExportedOne : translations[LANG].msgExportedAll)); })
         .catch(err => { console.error('Export:', err); showToast(translations[LANG].msgShareError + ' (' + kurzFehler(err) + ')'); });
 });
 /* ---- Pruefung importierter Taktikdateien ----------------------------
@@ -3201,6 +3280,7 @@ exportImgBtn.addEventListener('click', () => {
         }).then(blob => {
             return dateiSichern(blob, dateiname('Taktik_' + (tacticNameInput.value || 'Board'), '.png'), 'image/png', 'galerie');
         }).then(wohin => {
+            if(wohin === 'abbruch') return;
             showToast(wohin === 'galerie' ? translations[LANG].msgSavedToGallery : translations[LANG].msgImageSaved);
         }).catch(err => {
             console.error("Export Fehler: ", err);

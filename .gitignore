@@ -1,3 +1,16 @@
 # Wird im Workflow aus image.png / icon_fg.png / icon_bg.png erzeugt
 # und gehoert nicht ins Repo.
 res/android/
+
+# Wird im iOS-Workflow von tools/make_ios_icons.py erzeugt
+# und gehoert ebenfalls nicht ins Repo.
+res/ios/
+
+# Signier-Dateien NIEMALS ins Repo
+*.p12
+*.p8
+*.key
+*.mobileprovision
+*.cer
+secret-*.txt
+ios-signierung/

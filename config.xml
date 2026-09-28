@@ -28,4 +28,82 @@
         <icon density="xxhdpi"  src="res/android/icon-144.png" foreground="res/android/fg-324.png" background="res/android/bg-324.png" />
         <icon density="xxxhdpi" src="res/android/icon-192.png" foreground="res/android/fg-432.png" background="res/android/bg-432.png" />
     </platform>
+
+    <!-- =================================================================
+         iOS (iPhone und iPad). Wird nur von .github/workflows/ios.yml
+         gelesen; der Android-Build uebergeht diesen Block.
+
+         Die Build-Nummer (CFBundleVersion) steht bewusst NICHT hier: der
+         Workflow setzt sie aus der fortlaufenden Laufnummer. Apple verlangt
+         fuer jeden Upload eine neue Nummer - von Hand vergisst man das.
+         Die sichtbare Version kommt aus version="..." oben und muss in
+         App Store Connect genauso eingetragen sein.
+         ================================================================= -->
+    <platform name="ios">
+        <!-- iOS 15 und neuer. Apple nimmt kuenftig keine niedrigeren Werte an. -->
+        <preference name="deployment-target" value="15.0" />
+
+        <!-- Kein Gummiband-Effekt beim Ziehen am Seitenrand. Ohne das rutscht
+             auf dem iPhone die ganze Oberflaeche mit, wenn man einen Spieler
+             an den Feldrand zieht. -->
+        <preference name="DisallowOverscroll" value="true" />
+
+        <!-- Hoch- und Querformat. "default" gibt dem iPad alle vier Lagen
+             (Pflicht fuer Multitasking) und dem iPhone alle ausser Kopfueber.
+             fitFieldToScreen() passt das Feld bei jeder Drehung an. -->
+        <preference name="Orientation" value="default" />
+
+        <!-- Der Inhalt reicht bis unter die Statusleiste (viewport-fit=cover);
+             index.html haelt mit env(safe-area-inset-*) Abstand. Helle Schrift,
+             weil die Kopfzeile fast schwarz ist. -->
+        <preference name="StatusBarOverlaysWebView" value="true" />
+        <preference name="StatusBarStyle" value="lightcontent" />
+        <preference name="BackgroundColor" value="0xff222222" />
+
+        <!-- Wischen vom linken Rand geht zurueck, falls je eine Navigation die
+             App-Oberflaeche verlaesst. Ersetzt die fehlende Zurueck-Taste. -->
+        <preference name="AllowBackForwardNavigationGestures" value="true" />
+
+        <!-- Keine eigene Verschluesselung. Ohne diesen Eintrag fragt
+             App Store Connect bei jedem Build erneut nach. -->
+        <edit-config target="ITSAppUsesNonExemptEncryption" file="*-Info.plist" mode="overwrite">
+            <false/>
+        </edit-config>
+
+        <!-- "Bild sichern" im Teilen-Menue schreibt in die Fotomediathek.
+             Fehlt dieser Text, beendet iOS die App ohne Rueckfrage. -->
+        <edit-config target="NSPhotoLibraryAddUsageDescription" file="*-Info.plist" mode="overwrite">
+            <string>TacticBoard speichert auf deinen Wunsch Bilder und GIFs deiner Taktiken in der Fotomediathek. Vorhandene Fotos werden nicht gelesen.</string>
+        </edit-config>
+
+        <!-- Das Teilen-Plugin bringt diesen Schluessel mit Cordovas
+             Platzhaltertext mit. Apples automatische Pruefung weist
+             Platzhalter ab (bei FairMix so geschehen). Deshalb ein eigener
+             Text, obwohl TacticBoard keine Fotos liest. -->
+        <edit-config target="NSPhotoLibraryUsageDescription" file="*-Info.plist" mode="overwrite">
+            <string>TacticBoard speichert auf deinen Wunsch Bilder und GIFs deiner Taktiken in der Fotomediathek. Vorhandene Fotos werden weder gelesen noch veraendert.</string>
+        </edit-config>
+
+        <!-- App-Icons ohne Alphakanal. Die Dateien unter res/ios/ liegen NICHT
+             im Repo - tools/make_ios_icons.py erzeugt sie im Workflow aus
+             icon_store.png (Icons) sowie icon_fg.png und icon_bg.png
+             (Startbild). -->
+        <icon src="res/ios/icon-20.png"   width="20"   height="20" />
+        <icon src="res/ios/icon-29.png"   width="29"   height="29" />
+        <icon src="res/ios/icon-40.png"   width="40"   height="40" />
+        <icon src="res/ios/icon-58.png"   width="58"   height="58" />
+        <icon src="res/ios/icon-60.png"   width="60"   height="60" />
+        <icon src="res/ios/icon-76.png"   width="76"   height="76" />
+        <icon src="res/ios/icon-80.png"   width="80"   height="80" />
+        <icon src="res/ios/icon-87.png"   width="87"   height="87" />
+        <icon src="res/ios/icon-120.png"  width="120"  height="120" />
+        <icon src="res/ios/icon-152.png"  width="152"  height="152" />
+        <icon src="res/ios/icon-167.png"  width="167"  height="167" />
+        <icon src="res/ios/icon-180.png"  width="180"  height="180" />
+        <icon src="res/ios/icon-1024.png" width="1024" height="1024" />
+
+        <!-- Startbildschirm: ein quadratisches Bild deckt alle Geraete und
+             beide Lagen ab; cordova-ios baut daraus das Launch-Storyboard. -->
+        <splash src="res/ios/Default@2x~universal~anyany.png" />
+    </platform>
 </widget>
