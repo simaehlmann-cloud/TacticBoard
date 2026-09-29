@@ -723,7 +723,12 @@ function fitFieldToScreen(){
     const vw = window.innerWidth, vh = window.innerHeight;
     if(!vw || !vh) return;
 
-    const landscape = vw > vh;
+    /* Das Querformat-Layout (Feld oben ueber die volle Hoehe, Bedienung
+       darunter zum Scrollen) ist fuer Handys gedacht, deren Hoehe quer
+       kaum fuer Feld UND Knoepfe reicht. Ein Tablet hat quer genug Hoehe
+       fuer beides - dort bleibt das normale Layout, damit Feld und
+       Bedienelemente gleichzeitig sichtbar sind. */
+    const landscape = vw > vh && vh < 600;
     /* Klasse zuerst setzen, danach messen - so liefern die Kopf-/Fusszeile
        bereits die Hoehen des Querformat-Layouts. */
     document.body.classList.toggle('landscape-fit', landscape);
@@ -3090,7 +3095,15 @@ async function dateiSichern(blob, name, mimeTyp, modus){
     if(window.cordova && teilen && teilen.shareWithOptions){
         // Das Menue bietet je nach Dateityp "Bild sichern" (Fotos) oder
         // "In Dateien sichern" an - Galerie und Downloads zugleich.
-        const dataUrl = 'data:' + mimeTyp + ';base64,' + await blobZuBase64(blob);
+        //
+        // Das Praefix "df:<name>;" vor "data:" ist Absicht. Ein reines
+        // data:-Bild wandelt das Plugin auf iOS in ein UIImage um - dabei
+        // geht die GIF-Animation verloren (es bleibt ein Einzelbild im
+        // Format GIF87a), und Dropbox bekam sogar ein JPG. Mit dem Praefix
+        // erkennt das Plugin kein Bild, legt die Originaldatei unter genau
+        // diesem Namen ab und teilt sie als Datei. "Bild sichern" speichert
+        // dann das echte, animierte GIF.
+        const dataUrl = 'df:' + name + ';data:' + mimeTyp + ';base64,' + await blobZuBase64(blob);
         return await new Promise((resolve, reject) => {
             teilen.shareWithOptions(
                 { subject: name, files: [dataUrl], chooserTitle: name,
