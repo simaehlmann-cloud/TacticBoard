@@ -2661,6 +2661,15 @@ function brettLesen(){
     field.querySelectorAll('.player').forEach(p => players.push({ className: p.className, text: p.dataset.text || p.innerText, left: p.style.left, top: p.style.top, width: p.style.width, height: p.style.height, color: p.dataset.color || p.style.color, oid: p.dataset.oid, variant: p.dataset.variant || '', rotation: p.dataset.rotation || '' }));
     const arrows = [];
     field.querySelectorAll('.arrow-container').forEach(a => arrows.push({ points: JSON.parse(a.dataset.points || '[]'), color: a.dataset.color || '', dashed: a.dataset.dashed || 'false', targetOid: a.dataset.targetOid || '', step: a.dataset.step || '1', withBall: a.dataset.withBall || 'false', pace: a.dataset.pace || 'normal' }));
+    /* Nach dem Abspielen (oder mittendrin) stehen die Spieler auf End- bzw.
+       Zwischenpositionen. Gespeichert wird immer die Ausgangsaufstellung -
+       sonst liefe die Animation nach dem Laden vom falschen Ort los. */
+    if(animBaseline){
+        players.forEach(p => {
+            const b = animBaseline[p.oid];
+            if(b){ p.left = b.left; p.top = b.top; }
+        });
+    }
     return { sport: currentSport, players, arrows, drawing: drawingStrokes };
 }
 
@@ -3205,19 +3214,37 @@ function sanitizeTactic(t, erlaubeLeer){
 
     const arrows = (Array.isArray(t.arrows) ? t.arrows : []).slice(0, 60).map(a => {
         if(!a || typeof a !== 'object') return null;
+        /* Die App speichert Pfeilpunkte als [x, y] in Prozent (brettLesen,
+           buildArrowOnField). Hier wurde frueher nur {x, y} akzeptiert - dabei
+           fiel jeder Pfeil weg: beim Wiederherstellen nach dem Schliessen
+           der App ebenso wie beim Import einer Taktik-Datei. Beide Formen
+           werden angenommen, heraus kommt immer [x, y]. */
+        const zahl = v => Math.max(-20, Math.min(120, +v));
         const pts = (Array.isArray(a.points) ? a.points : []).slice(0, 12)
-            .map(pt => pt && isFinite(pt.x) && isFinite(pt.y)
-                ? { x: Math.max(-20, Math.min(120, +pt.x)), y: Math.max(-20, Math.min(120, +pt.y)) } : null)
+            .map(pt => {
+                if(Array.isArray(pt) && pt.length >= 2 && isFinite(pt[0]) && isFinite(pt[1])) return [zahl(pt[0]), zahl(pt[1])];
+                if(pt && typeof pt === 'object' && isFinite(pt.x) && isFinite(pt.y)) return [zahl(pt.x), zahl(pt.y)];
+                return null;
+            })
             .filter(Boolean);
-        return {
+        /* Sehr alte Dateien kennen noch keine Punkte, sondern Lage und Winkel.
+           Diese Angaben bleiben erhalten, brettAnwenden rechnet sie um. */
+        const alt = {};
+        if(pts.length < 2){
+            ['left', 'top', 'width', 'angle', 'curve'].forEach(k => {
+                if(a[k] !== undefined && isFinite(parseFloat(a[k]))) alt[k] = String(parseFloat(a[k]));
+            });
+            if(alt.left === undefined || alt.top === undefined) return null;
+        }
+        return Object.assign(alt, {
             points: pts,
             color: cleanColor(a.color), dashed: a.dashed === 'true' || a.dashed === true ? 'true' : 'false',
             targetOid: String(a.targetOid || '').replace(/[^\w-]/g, '').slice(0, 40),
             step: String(Math.max(1, Math.min(20, parseInt(a.step, 10) || 1))),
             withBall: a.withBall === 'true' || a.withBall === true ? 'true' : 'false',
             pace: ALLOWED_PACE.indexOf(a.pace) !== -1 ? a.pace : 'normal'
-        };
-    }).filter(a => a && a.points.length >= 2);
+        });
+    }).filter(Boolean);
 
     let drawing = [];
     if(typeof t.drawing === 'string' && t.drawing.startsWith('data:image/')){
@@ -3364,8 +3391,9 @@ const AUTOSAVE_KEY = 'tacticboard_autosave';
 
 function arbeitsstandSichern(){
     try {
-        if(isAnimating) return;          // waehrend der Animation stehen Objekte auf Zwischenpositionen
         if(brettIstLeer()){ localStorage.removeItem(AUTOSAVE_KEY); return; }
+        // Auch waehrend einer laufenden Animation: brettLesen liefert die
+        // Ausgangsaufstellung, nicht die Zwischenpositionen.
         localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(brettLesen()));
     } catch(e){ /* Speicher voll oder gesperrt - kein Grund, die App zu stoeren */ }
 }
