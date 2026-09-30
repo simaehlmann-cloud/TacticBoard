@@ -255,6 +255,22 @@ button { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 #step-display { min-width:24px; text-align:center; font-weight:bold; font-size:18px; }
 #arrow-anim-controls { background:#3a3a3a; padding:10px; border-radius:8px; }
 #anim-speed-slider { width:90px; cursor:pointer; }
+/* Zweikampf, Flugbahn, Fuss */
+#duel-btn { background:#b23a48; }
+#duel-btn.active-toggle { background:#ffb703; color:#000; }
+#flight-btn, #foot-btn { background:#555; }
+#flight-btn.active-toggle { background:#ffb703; color:#000; }
+@keyframes duelBlink {
+    0%, 49%   { box-shadow: 0 0 0 4px #ff1744, 0 0 16px 5px rgba(255,23,68,0.9); }
+    50%, 100% { box-shadow: 0 3px 5px rgba(0,0,0,0.4); }
+}
+.player.duel-blink { animation: duelBlink 0.34s linear infinite; }
+/* Im Malmodus liegt nichts ueber der Zeichenflaeche - so kann ein Strich
+   direkt auf einem Spieler oder Ball beginnen */
+#football-field.drawing-mode .player, #football-field.drawing-mode .arrow-container * { pointer-events:none !important; }
+.ball-shadow { position:absolute; left:0; top:0; border-radius:50%; background:rgba(0,0,0,0.38); pointer-events:none; z-index:9; filter:blur(1.5px); }
+.player.ball.in-flight { z-index:12; }
+.duel-path { stroke:#ff1744; }
 
 /* FOOTER */
 footer { position:fixed; bottom:0; left:0; right:0; width:100%; padding:12px; background:rgba(0,0,0,0.9); display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.1); z-index: 1000; box-sizing: border-box; touch-action: manipulation; }
@@ -384,6 +400,7 @@ body.landscape-fit footer {
             <button id="item-btn" title="Tor">🥅</button>
             <button id="cone-btn" title="Hütchen">▲</button>
             <button id="add-arrow-btn">➦ Pfeil</button>
+            <button id="duel-btn" style="display:none;">⚔️ Zweikampf</button>
             <button id="delete-btn">🗑️ Objekt löschen</button>
             <button id="undo-draw-btn">↩️ Rückgängig</button>
         </div>
@@ -405,6 +422,8 @@ body.landscape-fit footer {
             <span id="step-display">1</span>
             <button id="step-plus">+</button>
             <button id="with-ball-btn">⚽ Mit Ball</button>
+            <button id="flight-btn" style="display:none;">〰️ Flach</button>
+            <button id="foot-btn" style="display:none;">🦶 Fuß: auto</button>
             <button id="pace-btn">🏃 Normal</button>
             <button id="add-point-btn">＋ Punkt</button>
             <button id="remove-point-btn">− Punkt</button>
@@ -491,7 +510,7 @@ body.landscape-fit footer {
         Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
         Entwickelt von <strong>Simon Mählmann</strong>.
     </div>
-    <div id="app-version" style="font-size:12px; color:#9fb3c8; margin-bottom:14px;">Version 2.2.0</div>
+    <div id="app-version" style="font-size:12px; color:#9fb3c8; margin-bottom:14px;">Version 2.3.0</div>
     <button id="show-privacy-btn" style="background:#3d6b8a; width: 100%; justify-content:center; margin-bottom:8px;">Datenschutzerklärung</button>
     <button id="show-imprint-btn" style="background:#3d6b8a; width: 100%; justify-content:center; margin-bottom:8px;">Impressum</button>
     <button id="show-onboarding-btn" style="background:#457b9d; width: 100%; justify-content:center; margin-bottom:8px;">Kurzanleitung</button>
@@ -622,6 +641,10 @@ const animSpeedLabel = document.getElementById('animSpeedLabel');
 const addPointBtn = document.getElementById('add-point-btn');
 const removePointBtn = document.getElementById('remove-point-btn');
 const paceBtn = document.getElementById('pace-btn');
+const duelBtn = document.getElementById('duel-btn');
+const flightBtn = document.getElementById('flight-btn');
+const footBtn = document.getElementById('foot-btn');
+let duelSource = null;   // Spieler, der auf seinen Zweikampf-Gegner wartet
 const loopBtn = document.getElementById('loop-btn');
 const exportGifBtn = document.getElementById('export-gif-btn');
 const animToggleBtn = document.getElementById('anim-toggle-btn');
@@ -633,7 +656,7 @@ const zoomLabelEl = document.getElementById('zoomLabel');
 const devCreditsEl = document.getElementById('dev-credits-text');
 const aboutTextEl = document.getElementById('about-text');
 /* Versionsnummer - muss mit config.xml uebereinstimmen */
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const appVersionEl = document.getElementById('app-version');
 if(appVersionEl) appVersionEl.textContent = 'Version ' + APP_VERSION;
 const flagDe = document.getElementById('flag-de');
@@ -857,12 +880,7 @@ function pushCanvasHistory(){
 }
 function pushDeleteHistory(el){
     if(el.classList.contains('arrow-container')){
-        actionHistory.push({ type:'arrow', data:{
-            points: el.dataset.points || '[]',
-            color: el.dataset.color || '', dashed: el.dataset.dashed || 'false',
-            targetOid: el.dataset.targetOid || '', step: el.dataset.step || '1', withBall: el.dataset.withBall || 'false',
-            pace: el.dataset.pace || 'normal'
-        }});
+        actionHistory.push({ type:'arrow', data: arrowData(el) });
     } else {
         const isMovableObj = !el.className.includes('cone') && !el.className.includes('disc') && !el.className.includes('pole') && !el.className.includes('dummy');
         actionHistory.push({ type:'player', data:{
@@ -870,7 +888,8 @@ function pushDeleteHistory(el){
             left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height,
             color: el.dataset.color || el.style.color,
             movable: isMovableObj, oid: el.dataset.oid,
-            variant: el.dataset.variant || '', rotation: el.dataset.rotation || ''
+            variant: el.dataset.variant || '', rotation: el.dataset.rotation || '',
+            scale: el.dataset.scale || ''
         }});
     }
     trimHistory();
@@ -886,11 +905,15 @@ function undoLast(){
         drawingStrokes = action.data;
         redrawCanvas();
     } else if(action.type === 'arrow'){
-        const a = action.data;
-        buildArrowOnField(JSON.parse(a.points || '[]'), a.color, a.dashed === 'true', a.targetOid, a.step, a.withBall === 'true', a.pace);
+        buildArrowFromData(action.data);
+    } else if(action.type === 'arrowAdd'){
+        // Gemalter Laufweg oder Zweikampf wird wieder entfernt
+        if(action.el === activeArrow) selectArrow(null);
+        if(action.el && action.el.isConnected) action.el.remove();
+        updateButtonVisibility();
     } else if(action.type === 'player'){
         const p = action.data;
-        const el = createObject(p.className, p.text, p.left, p.top, sizePercentFor(p.className), p.movable, p.width, p.height, p.color, p.oid, p.variant, p.rotation);
+        const el = createObject(p.className, p.text, p.left, p.top, sizePercentFor(p.className), p.movable, p.width, p.height, p.color, p.oid, p.variant, p.rotation, p.scale);
         if(p.className.includes('player') && !p.className.includes('ball') && !p.className.includes('cone') && !p.className.includes('item-obj') && !p.className.includes('disc') && !p.className.includes('pole') && !p.className.includes('dummy')) setupDoubleClickToggle(el);
     }
     updateUndoState();
@@ -951,8 +974,19 @@ function moveDraw(e){
 
 function endDraw(e){
     if(!isDrawingMode) return;
+    const warAktiv = drawing;
     drawing = false;
     if(redrawPending) redrawCanvas();   // letzten Zwischenstand sicher zeichnen
+    /* Im Animationsmodus wird ein Strich, der auf einem Spieler oder Ball
+       beginnt, zum abspielbaren Weg. Alle anderen Striche bleiben Zeichnung. */
+    if(warAktiv && isAnimMode && currentStroke && currentStroke.color !== 'erase'){
+        if(strichZuLaufweg(currentStroke)){
+            const i = drawingStrokes.lastIndexOf(currentStroke);
+            if(i !== -1) drawingStrokes.splice(i, 1);
+            redrawCanvas();
+        }
+    }
+    currentStroke = null;
 }
 canvas.addEventListener('touchstart', startDraw, {passive: false}); canvas.addEventListener('touchmove', moveDraw, {passive: false});
 canvas.addEventListener('touchend', endDraw); canvas.addEventListener('mousedown', startDraw);
@@ -965,6 +999,7 @@ function updateToolSliders(){
 const createBtns = [actionBtn, enemyBtn, ballBtn, itemBtn, coneBtn];
 drawToggleBtn.addEventListener('click', () => {
     isDrawingMode = !isDrawingMode;
+    field.classList.toggle('drawing-mode', isDrawingMode);
     if(isDrawingMode){
         canvas.style.pointerEvents = 'auto'; 
         drawToggleBtn.style.background = '#ffeb3b'; drawToggleBtn.style.color = '#000'; 
@@ -1047,7 +1082,29 @@ function applyLabelSize(el){
         : 'clamp(4.5px, 1.25vw, 8px)';
 }
 
-function createObject(className, text, left, top, sizePercent, selectable, wPercent=null, hPercent=null, objColor=null, oid=null, variant=null, rotation=null){
+/* Huetchen und Trainingsgeraete lassen sich vergroessern. Gespeichert wird
+   ein Faktor (dataset.scale); Breite und beim Huetchen die Schrift folgen daraus. */
+const EQUIP_BASE = { cone: 8, disc: 6, pole: 2.5, dummy: 5 };
+const EQUIP_SCALE_MIN = 0.5, EQUIP_SCALE_MAX = 4;
+function equipType(el){
+    if(!el || !el.classList) return null;
+    for(const k in EQUIP_BASE){ if(el.classList.contains(k)) return k; }
+    return null;
+}
+function applyEquipScale(el, s){
+    const ty = equipType(el);
+    if(!ty) return;
+    s = Math.max(EQUIP_SCALE_MIN, Math.min(EQUIP_SCALE_MAX, +s || 1));
+    el.dataset.scale = +s.toFixed(3);
+    el.style.width = (EQUIP_BASE[ty] * s).toFixed(2) + '%';
+    el.style.height = '';
+    if(ty === 'cone') el.style.fontSize = (24 * s).toFixed(1) + 'px';
+}
+function equipFertig(el, scale){
+    if(scale && isFinite(parseFloat(scale)) && parseFloat(scale) !== 1) applyEquipScale(el, parseFloat(scale));
+    return el;
+}
+function createObject(className, text, left, top, sizePercent, selectable, wPercent=null, hPercent=null, objColor=null, oid=null, variant=null, rotation=null, scale=null){
     const el = document.createElement('div');
     el.className = className; el.style.left = left; el.style.top = top;
     el.dataset.selectable = selectable ? '1' : '0'; el.dataset.text = text;
@@ -1060,23 +1117,23 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
         el.innerText = '▲'; 
         el.style.color = objColor || getConeColor(currentSport);
         el.dataset.color = el.style.color;
-        setupPercentDrag(el, sizePercent); field.appendChild(el); return el;
+        setupPercentDrag(el, sizePercent); field.appendChild(el); return equipFertig(el, scale);
     }
     if (className.includes('disc')) {
         el.innerHTML = equipSvg('disc');
         el.style.color = objColor || getConeColor(currentSport);
         el.dataset.color = el.style.color;
-        setupPercentDrag(el, 6); field.appendChild(el); return el;
+        setupPercentDrag(el, 6); field.appendChild(el); return equipFertig(el, scale);
     }
     if (className.includes('pole')) {
         el.innerHTML = equipSvg('pole');
         el.style.color = objColor || getConeColor(currentSport);
         el.dataset.color = el.style.color;
-        setupPercentDrag(el, 3); field.appendChild(el); return el;
+        setupPercentDrag(el, 3); field.appendChild(el); return equipFertig(el, scale);
     }
     if (className.includes('dummy')) {
         el.innerHTML = equipSvg('dummy');
-        setupPercentDrag(el, 5); field.appendChild(el); return el;
+        setupPercentDrag(el, 5); field.appendChild(el); return equipFertig(el, scale);
     }
     if (className.includes('puck')) { el.innerText = text; setupPercentDrag(el, 6); field.appendChild(el); return el; }
     if (className.includes('item-obj')) {
@@ -1111,7 +1168,7 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
    danach wirken zwei Finger irgendwo auf dem Feld darauf.
    Griffe und Knopfzeile bleiben zusaetzlich bestehen. */
 function setupFieldPinch(){
-    let ziel = null, startAbstand = 0, startWinkel = 0, startBreite = 0, startDrehung = 0, aktiv = false;
+    let ziel = null, startAbstand = 0, startWinkel = 0, startBreite = 0, startDrehung = 0, startScale = 1, aktiv = false;
 
     function abstand(t){
         return Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
@@ -1123,6 +1180,11 @@ function setupFieldPinch(){
     function bewege(ev){
         if(!aktiv || !ziel || !ev.touches || ev.touches.length < 2) return;
         if(ev.cancelable) ev.preventDefault();
+        if(equipType(ziel)){
+            // Huetchen & Co.: nur Groesse, keine Drehung
+            applyEquipScale(ziel, startScale * abstand(ev.touches) / startAbstand);
+            return;
+        }
         const ar = itemAspect(ziel.dataset.variant || 'goal');
 
         const faktor = abstand(ev.touches) / startAbstand;
@@ -1153,10 +1215,11 @@ function setupFieldPinch(){
         // Nur wenn gerade ein Tor, Netz oder Korb ausgewaehlt ist. Spieler und
         // Huetchen haben feste Groessen, dort soll die Geste nichts tun.
         const el = activePlayer;
-        if(!el || !el.classList.contains('item-obj')) return;
+        if(!el || !(el.classList.contains('item-obj') || equipType(el))) return;
         if(ev.cancelable) ev.preventDefault();
         ziel = el;
         aktiv = true;
+        startScale = parseFloat(el.dataset.scale || '1') || 1;
         startAbstand = abstand(ev.touches) || 1;
         startWinkel = winkel(ev.touches);
         startBreite = itemPercent(el, 'width');
@@ -1459,7 +1522,9 @@ addArrowBtn.addEventListener('click', () => {
     const fw = field.clientWidth, fh = field.clientHeight;
     const c = centerOf(activePlayer);
     // Hat das Objekt schon Pfeile? Dann neuen Pfeil versetzen und Schritt automatisch hochzählen
-    const existing = field.querySelectorAll('.arrow-container[data-target-oid="' + activePlayer.dataset.oid + '"]').length;
+    const oidAkt = activePlayer.dataset.oid;
+    const existing = Array.from(field.querySelectorAll('.arrow-container'))
+        .filter(a => a.dataset.targetOid === oidAkt && a.dataset.kind !== 'duel').length;
     const sx = c.x / fw * 100, sy = Math.min(92, c.y / fh * 100 + existing * 8);
     let ex = sx + 18; if(ex > 98) ex = sx - 18;
     const arrow = buildArrowOnField([[+sx.toFixed(3), +sy.toFixed(3)], [+ex.toFixed(3), +sy.toFixed(3)]], currentColor, currentLineStyle === 'dashed', activePlayer.dataset.oid, String(existing + 1), false);
@@ -1517,6 +1582,7 @@ function docDrag(onMove){
 // Aktualisiert NUR Attribute der bestehenden Elemente - kein Neuaufbau,
 // damit laufende Touch-Gesten nicht abbrechen
 function applyArrowVisual(arrow){
+    if(arrow.dataset.kind === 'duel'){ arrow._duelKey = ''; applyDuelVisual(arrow); return; }
     const pts = getArrowPixelPoints(arrow);
     if(pts.length < 2) return;
     const fw = field.clientWidth, fh = field.clientHeight;
@@ -1539,13 +1605,18 @@ function applyArrowVisual(arrow){
         dFull += seg;
         if(i <= cut) dCut += seg;
     }
+    // Dribbling = Wellenlinie (wie auf der Taktiktafel ueblich)
+    if(arrow.dataset.withBall === 'true') dCut = wellenPfad(samples.slice(0, cut + 1));
     const last = samples[samples.length - 1], prev = samples[Math.max(0, samples.length - 3)];
     const headAng = (Math.atan2(last.y - prev.y, last.x - prev.x) * 180 / Math.PI).toFixed(1);
     arrow.querySelector('.arrow-hit').setAttribute('d', dFull);
     const p = arrow.querySelector('.arrow-path');
     p.setAttribute('d', dCut);
     p.setAttribute('stroke', color);
-    if(dashed) p.setAttribute('stroke-dasharray', '10 7'); else p.removeAttribute('stroke-dasharray');
+    // Hoher Ball = gepunktet, Laufweg = gestrichelt, Dribbling (Welle) und flacher Pass = durchgezogen
+    if(arrow.dataset.flight === 'high') p.setAttribute('stroke-dasharray', '0.1 9');
+    else if(dashed && arrow.dataset.withBall !== 'true') p.setAttribute('stroke-dasharray', '10 7');
+    else p.removeAttribute('stroke-dasharray');
     const headHit = arrow.querySelector('.arrow-head-hit');
     headHit.setAttribute('cx', last.x.toFixed(1)); headHit.setAttribute('cy', last.y.toFixed(1));
     const head = arrow.querySelector('.arrow-head');
@@ -1568,8 +1639,11 @@ function syncArrowHandles(arrow, pts){
         g.appendChild(c);
         wirePointHandle(arrow, c);
     }
+    // Gemalte Wege haben viele Punkte - dort nur Anfang und Ende als Griff zeigen
+    const viele = pts.length > 12;
     Array.from(g.children).forEach((c, i) => {
         c.dataset.idx = i;
+        c.style.display = (viele && i > 0 && i < pts.length - 1) ? 'none' : '';
         c.setAttribute('r', (i === 0 || i === pts.length - 1) ? 13 : 10);
         c.setAttribute('cx', pts[i].x.toFixed(1));
         c.setAttribute('cy', pts[i].y.toFixed(1));
@@ -1632,16 +1706,32 @@ function wireArrowBase(arrow){
         el.addEventListener('touchstart', startHead, {passive:false}); el.addEventListener('mousedown', startHead);
     });
 }
-function buildArrowOnField(pointsPercent, color, dashed, targetOid, step, withBall, pace) {
+function buildArrowOnField(pointsPercent, color, dashed, targetOid, step, withBall, pace, opts) {
+    opts = opts || {};
     const arrow = document.createElementNS(SVG_NS, 'svg');
     arrow.setAttribute('class', 'arrow-container');
-    arrow.dataset.points = JSON.stringify(pointsPercent);
+    arrow.dataset.points = JSON.stringify(pointsPercent || []);
     arrow.dataset.color = color || currentColor;
     arrow.dataset.dashed = dashed ? 'true' : 'false';
     arrow.dataset.targetOid = targetOid || '';
     arrow.dataset.step = step || '1';
     arrow.dataset.withBall = withBall ? 'true' : 'false';
     arrow.dataset.pace = pace || 'normal';
+    arrow.dataset.flight = opts.flight === 'high' ? 'high' : 'low';
+    arrow.dataset.foot = (opts.foot === 'left' || opts.foot === 'right') ? opts.foot : 'auto';
+    if(opts.kind === 'duel'){
+        arrow.dataset.kind = 'duel';
+        arrow.dataset.withOid = opts.withOid || '';
+        arrow.innerHTML =
+            '<path class="arrow-hit" fill="none" stroke="rgba(0,0,0,0.001)" stroke-width="30" stroke-linecap="round" pointer-events="stroke"/>' +
+            '<path class="arrow-path duel-path" fill="none" stroke-width="3.5" stroke-linejoin="miter" stroke-linecap="round"/>' +
+            '<g class="duel-mark" pointer-events="none"><circle r="11" fill="#fff" stroke="#ff1744" stroke-width="2.5"/><text text-anchor="middle" font-size="13">⚔️</text></g>' +
+            '<g class="arrow-badge-svg"><circle r="10" fill="#1d3557" stroke="#ff1744" stroke-width="2"/><text text-anchor="middle" font-size="11" font-weight="bold" fill="#fff"></text></g>';
+        field.appendChild(arrow);
+        wireDuel(arrow);
+        applyDuelVisual(arrow);
+        return arrow;
+    }
     arrow.innerHTML =
         '<path class="arrow-hit" fill="none" stroke="rgba(0,0,0,0.001)" stroke-width="30" stroke-linecap="round" pointer-events="stroke"/>' +
         '<path class="arrow-path" fill="none" stroke-width="4" stroke-linecap="round"/>' +
@@ -1653,6 +1743,223 @@ function buildArrowOnField(pointsPercent, color, dashed, targetOid, step, withBa
     wireArrowBase(arrow);
     applyArrowVisual(arrow);
     return arrow;
+}
+/* Wellenlinie entlang einer Punktfolge (fuer Dribblings). Die Welle laeuft
+   an beiden Enden flach aus, damit Start und Pfeilspitze sauber sitzen. */
+function wellenPfad(pts){
+    if(pts.length < 2) return '';
+    // gleichmaessig alle 2 px abtasten
+    const eq = [pts[0]];
+    let rest = 0;
+    for(let i = 1; i < pts.length; i++){
+        const a = pts[i-1], b = pts[i];
+        const l = Math.hypot(b.x - a.x, b.y - a.y);
+        let d = 2 - rest;
+        while(d <= l){ eq.push({ x: a.x + (b.x - a.x) * d / l, y: a.y + (b.y - a.y) * d / l }); d += 2; }
+        rest = l - (d - 2);
+    }
+    eq.push(pts[pts.length - 1]);
+    const total = (eq.length - 1) * 2;
+    const WL = 18, AMP = 3.4;
+    let d = 'M' + eq[0].x.toFixed(1) + ' ' + eq[0].y.toFixed(1);
+    for(let i = 1; i < eq.length; i++){
+        const a = eq[Math.max(0, i - 1)], b = eq[Math.min(eq.length - 1, i + 1)];
+        const tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1;
+        const s = i * 2;
+        const taper = Math.max(0, Math.min(1, s / 10, (total - s) / 10));
+        const off = AMP * taper * Math.sin(2 * Math.PI * s / WL);
+        d += ' L' + (eq[i].x - ty / tl * off).toFixed(1) + ' ' + (eq[i].y + tx / tl * off).toFixed(1);
+    }
+    return d;
+}
+
+/* ---------- Zweikampf ---------- */
+function applyDuelVisual(arrow){
+    const a = findByOid(arrow.dataset.targetOid), b = findByOid(arrow.dataset.withOid);
+    const fw = field.clientWidth, fh = field.clientHeight;
+    const path = arrow.querySelector('.arrow-path'), hit = arrow.querySelector('.arrow-hit');
+    if(!path || !hit) return;
+    if(!a || !b){ path.setAttribute('d', ''); hit.setAttribute('d', ''); return; }
+    const A = centerOf(a), B = centerOf(b);
+    const key = [fw, fh, A.x, A.y, B.x, B.y, arrow.dataset.step].join(',');
+    if(arrow._duelKey === key) return;   // nichts veraendert - nichts anfassen
+    arrow._duelKey = key;
+    arrow.setAttribute('viewBox', '0 0 ' + fw + ' ' + fh);
+    const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const ra = a.offsetWidth / 2 * 0.85, rb = b.offsetWidth / 2 * 0.85;
+    const S = { x: A.x + ux * ra, y: A.y + uy * ra }, E = { x: B.x - ux * rb, y: B.y - uy * rb };
+    const inner = Math.max(0, len - ra - rb);
+    let d = 'M' + S.x.toFixed(1) + ' ' + S.y.toFixed(1);
+    if(inner > 8){
+        const n = Math.max(3, Math.round(inner / 11));
+        for(let i = 1; i < n; i++){
+            const t = i / n, amp = (i % 2 ? 7 : -7);
+            d += ' L' + (S.x + (E.x - S.x) * t + nx * amp).toFixed(1) + ' ' + (S.y + (E.y - S.y) * t + ny * amp).toFixed(1);
+        }
+    }
+    d += ' L' + E.x.toFixed(1) + ' ' + E.y.toFixed(1);
+    path.setAttribute('d', d);
+    hit.setAttribute('d', 'M' + A.x.toFixed(1) + ' ' + A.y.toFixed(1) + ' L' + B.x.toFixed(1) + ' ' + B.y.toFixed(1));
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    const mc = arrow.querySelector('.duel-mark circle'), mt = arrow.querySelector('.duel-mark text');
+    mc.setAttribute('cx', mx.toFixed(1)); mc.setAttribute('cy', my.toFixed(1));
+    mt.setAttribute('x', mx.toFixed(1)); mt.setAttribute('y', (my + 4.5).toFixed(1));
+    const bc = arrow.querySelector('.arrow-badge-svg circle'), bt = arrow.querySelector('.arrow-badge-svg text');
+    bc.setAttribute('cx', mx.toFixed(1)); bc.setAttribute('cy', (my - 24).toFixed(1));
+    bt.setAttribute('x', mx.toFixed(1)); bt.setAttribute('y', (my - 20.2).toFixed(1));
+    bt.textContent = arrow.dataset.step || '1';
+}
+function wireDuel(arrow){
+    const hit = arrow.querySelector('.arrow-hit');
+    function tap(e){
+        if(isDrawingMode || isAnimating) return;
+        e.stopPropagation(); if(e.cancelable) e.preventDefault();
+        selectArrow(arrow);
+    }
+    hit.addEventListener('touchstart', tap, {passive:false}); hit.addEventListener('mousedown', tap);
+}
+// Zweikampf-Linien folgen den Spielern (Ziehen, Animation, Drehen des Geraets)
+(function duelTick(){
+    field.querySelectorAll('.arrow-container[data-kind="duel"]').forEach(applyDuelVisual);
+    requestAnimationFrame(duelTick);
+})();
+function isDuelable(el){
+    return !!el && el.dataset.selectable === '1' && !el.classList.contains('ball') && !el.classList.contains('item-obj');
+}
+function naechsterSchritt(){
+    let max = 0;
+    field.querySelectorAll('.arrow-container').forEach(a => { max = Math.max(max, parseInt(a.dataset.step || '1', 10) || 1); });
+    return Math.min(20, max + 1);
+}
+function zweikampfAnlegen(a, b){
+    const d = buildArrowOnField([], '#ff1744', false, a.dataset.oid, String(naechsterSchritt()), false, 'normal', { kind: 'duel', withOid: b.dataset.oid });
+    actionHistory.push({ type: 'arrowAdd', el: d }); trimHistory();
+    selectArrow(d);
+    showToast(translations[LANG].msgDuelCreated(d.dataset.step));
+}
+function duelAbbrechen(){
+    duelSource = null;
+    duelBtn.classList.remove('active-toggle');
+}
+
+/* ---------- Gemalter Strich -> Laufweg ---------- */
+function istBeweglich(el){
+    return el.dataset.selectable === '1' && !el.classList.contains('item-obj');
+}
+function naechsterBall(pos, von, maxD){
+    let best = null, bestD = Infinity;
+    pos.forEach((p, el) => {
+        if(!el.classList.contains('ball')) return;
+        const d = Math.hypot(p.x - von.x, p.y - von.y);
+        if(d < bestD){ bestD = d; best = el; }
+    });
+    return (best && bestD < maxD) ? best : null;
+}
+/* Wo steht jedes Objekt, nachdem alle bisherigen Schritte gelaufen sind?
+   Damit kann man einen Pass dort ansetzen, wo das Dribbling endet. */
+function projizierteLagen(){
+    const pos = new Map();
+    field.querySelectorAll('.player').forEach(el => { if(istBeweglich(el)) pos.set(el, centerOf(el)); });
+    const arrows = Array.from(field.querySelectorAll('.arrow-container'))
+        .filter(a => a.dataset.kind !== 'duel')
+        .sort((x, y) => (parseInt(x.dataset.step, 10) || 1) - (parseInt(y.dataset.step, 10) || 1));
+    arrows.forEach(a => {
+        const tgt = findByOid(a.dataset.targetOid);
+        if(!tgt || !pos.has(tgt)) return;
+        const pts = getArrowPixelPoints(a);
+        if(pts.length < 2) return;
+        const s = pos.get(tgt);
+        const end = { x: pts[pts.length - 1].x - pts[0].x + s.x, y: pts[pts.length - 1].y - pts[0].y + s.y };
+        if(a.dataset.withBall === 'true' && !tgt.classList.contains('ball')){
+            const b = naechsterBall(pos, s, field.clientWidth * 0.2);
+            if(b){
+                // Der Ball endet wie in der Animation knapp vor dem Spieler
+                const q = pts[pts.length - 2], z = pts[pts.length - 1];
+                const l = Math.hypot(z.x - q.x, z.y - q.y) || 1;
+                const fwd = tgt.offsetWidth / 2 + b.offsetWidth / 4;
+                pos.set(b, { x: end.x + (z.x - q.x) / l * fwd, y: end.y + (z.y - q.y) / l * fwd });
+            }
+        }
+        pos.set(tgt, end);
+    });
+    return pos;
+}
+function rdp(pts, eps){
+    if(pts.length < 3) return pts.slice();
+    const A = pts[0], B = pts[pts.length - 1];
+    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
+    let idx = 0, dmax = 0;
+    for(let i = 1; i < pts.length - 1; i++){
+        const d = Math.abs(dy * pts[i].x - dx * pts[i].y + B.x * A.y - B.y * A.x) / L;
+        if(d > dmax){ dmax = d; idx = i; }
+    }
+    if(dmax <= eps) return [A, B];
+    const l = rdp(pts.slice(0, idx + 1), eps), r = rdp(pts.slice(idx), eps);
+    return l.slice(0, -1).concat(r);
+}
+function strichZuLaufweg(stroke){
+    const fw = field.clientWidth, fh = field.clientHeight;
+    const raw = (stroke.points || []).map(p => ({ x: p.x * fw, y: p.y * fh }));
+    if(raw.length < 2) return false;
+    let len = 0;
+    for(let i = 1; i < raw.length; i++) len += Math.hypot(raw[i].x - raw[i-1].x, raw[i].y - raw[i-1].y);
+    if(len < 25) return false;
+    // Startobjekt suchen - an der aktuellen oder der Endlage nach den bisherigen Schritten
+    const pos = projizierteLagen();
+    /* Wer direkt auf dem Ball ansetzt, meint einen Pass - der Ball hat daher
+       Vorrang. Am Spieler (neben dem Ball) angesetzt wird es Lauf/Dribbling. */
+    let tgt = null, bestQ = Infinity, tgtPos = null;
+    [true, false].forEach(nurBall => {
+        if(tgt) return;
+        pos.forEach((p, el) => {
+            if(el.classList.contains('ball') !== nurBall) return;
+            const r = Math.max(el.offsetWidth / 2, 14) + (nurBall ? 4 : 8);
+            const q = Math.hypot(p.x - raw[0].x, p.y - raw[0].y) / r;
+            if(q < 1 && q < bestQ){ bestQ = q; tgt = el; tgtPos = p; }
+        });
+    });
+    if(!tgt) return false;
+    const istBall = tgt.classList.contains('ball');
+    let mitBall = false;
+    if(!istBall){
+        const b = naechsterBall(pos, tgtPos, tgt.offsetWidth * 1.3);
+        mitBall = !!b;
+    }
+    // Start exakt auf das Objekt setzen, Form glaetten und ausduennen
+    let pts = raw.slice(); pts[0] = { x: tgtPos.x, y: tgtPos.y };
+    let eps = 2, simp = rdp(pts, eps);
+    while(simp.length > 60){ eps *= 1.5; simp = rdp(pts, eps); }
+    const pct = simp.map(p => [
+        +Math.min(100, Math.max(0, p.x / fw * 100)).toFixed(3),
+        +Math.min(100, Math.max(0, p.y / fh * 100)).toFixed(3)
+    ]);
+    const art = istBall ? 'pass' : (mitBall ? 'dribble' : 'run');
+    const step = String(naechsterSchritt());
+    const arrow = buildArrowOnField(pct, stroke.color, art === 'run', tgt.dataset.oid, step, art === 'dribble', 'normal', {});
+    /* Der Verlauf enthaelt schon den Zeichen-Schnappschuss von startDraw -
+       den ersetzen, damit Rueckgaengig den Weg entfernt statt einen leeren
+       Zeichenstand herzustellen. */
+    const top = actionHistory[actionHistory.length - 1];
+    if(top && top.type === 'canvas') actionHistory.pop();
+    actionHistory.push({ type: 'arrowAdd', el: arrow }); trimHistory();
+    showToast(translations[LANG].msgPathCreated(translations[LANG].pathKinds[art], step));
+    return true;
+}
+
+function arrowData(a){
+    let pts = [];
+    try { pts = JSON.parse(a.dataset.points || '[]'); } catch(e){}
+    return {
+        points: pts, color: a.dataset.color || '', dashed: a.dataset.dashed || 'false',
+        targetOid: a.dataset.targetOid || '', step: a.dataset.step || '1', withBall: a.dataset.withBall || 'false',
+        pace: a.dataset.pace || 'normal', flight: a.dataset.flight || 'low', foot: a.dataset.foot || 'auto',
+        kind: a.dataset.kind || '', withOid: a.dataset.withOid || ''
+    };
+}
+function buildArrowFromData(a, pts){
+    return buildArrowOnField(pts || a.points || [], a.color, a.dashed === 'true', a.targetOid, a.step, a.withBall === 'true', a.pace,
+        { flight: a.flight, foot: a.foot, kind: a.kind, withOid: a.withOid });
 }
 function legacyArrowPoints(a){
     const fw = field.clientWidth, fh = field.clientHeight;
@@ -1681,7 +1988,7 @@ deleteBtn.addEventListener('click', () => {
         const oid = activePlayer.dataset.oid;
         const verwaist = oid
             ? Array.from(field.querySelectorAll('.arrow-container'))
-                   .filter(a => a.dataset.targetOid === oid)
+                   .filter(a => a.dataset.targetOid === oid || a.dataset.withOid === oid)
             : [];
         verwaist.forEach(a => { pushDeleteHistory(a); a.remove(); });
         pushDeleteHistory(activePlayer);
@@ -1691,12 +1998,18 @@ deleteBtn.addEventListener('click', () => {
     updateButtonVisibility();
 });
 function selectPlayer(p){
+    if(duelSource){
+        const src = duelSource;
+        duelAbbrechen();
+        if(p && p !== src && isDuelable(p) && src.isConnected){ zweikampfAnlegen(src, p); return; }
+    }
     if(activePlayer) activePlayer.classList.remove('active');
     if(activeArrow) activeArrow.classList.remove('active');
     activeArrow = null; activePlayer = p;
     if(p) p.classList.add('active'); updateButtonVisibility();
 }
 function selectArrow(a){
+    if(duelSource) duelAbbrechen();
     if(activePlayer) activePlayer.classList.remove('active');
     if(activeArrow) activeArrow.classList.remove('active');
     activePlayer = null; activeArrow = a;
@@ -1705,12 +2018,17 @@ function selectArrow(a){
 function updateButtonVisibility(){
     const realP = activePlayer && activePlayer.dataset.selectable === '1';
     const istItem = !!activePlayer && activePlayer.classList.contains('item-obj');
-    itemControls.style.display = (istItem && !isDrawingMode) ? 'flex' : 'none';
+    const istGeraet = !!activePlayer && !!equipType(activePlayer);
+    itemControls.style.display = ((istItem || istGeraet) && !isDrawingMode) ? 'flex' : 'none';
+    // Huetchen & Co. werden nur groesser/kleiner, nicht gedreht
+    ['item-rot-left', 'item-rot-right', 'item-rot-snap'].forEach(id => { document.getElementById(id).style.display = istGeraet ? 'none' : ''; });
+    duelBtn.style.display = (!isDrawingMode && isDuelable(activePlayer)) ? 'inline-flex' : 'none';
     clearDrawingsBtn.style.display = isDrawingMode ? 'inline-flex' : 'none';
     if(isDrawingMode){ addArrowBtn.style.display = 'none'; deleteBtn.style.display = 'none'; }
     else { addArrowBtn.style.display = realP ? 'inline-flex' : 'none'; deleteBtn.style.display = (activePlayer || activeArrow) ? 'inline-flex' : 'none'; }
 
-    if(isDrawingMode || !activeArrow){
+    const istDuell = !!activeArrow && activeArrow.dataset.kind === 'duel';
+    if(isDrawingMode || !activeArrow || (istDuell && !isAnimMode)){
         arrowAnimControls.style.display = 'none';
     } else {
         arrowAnimControls.style.display = 'flex';
@@ -1724,8 +2042,17 @@ function updateButtonVisibility(){
         const tgt = findByOid(activeArrow.dataset.targetOid);
         const isBallTarget = tgt && tgt.classList.contains('ball');
         const canDribble = tgt && !isBallTarget && !tgt.classList.contains('cone') && !tgt.classList.contains('item-obj');
-        withBallBtn.style.display = (isAnimMode && canDribble) ? 'inline-flex' : 'none';
+        withBallBtn.style.display = (isAnimMode && canDribble && !istDuell) ? 'inline-flex' : 'none';
         withBallBtn.classList.toggle('active-toggle', activeArrow.dataset.withBall === 'true');
+        // Gemalte Wege (viele Punkte) und Zweikaempfe haben keine Punkt-Knoepfe
+        addPointBtn.style.display = removePointBtn.style.display = (istDuell || ptsLen > 12) ? 'none' : '';
+        if(istDuell) paceBtn.style.display = 'none';
+        const flight = activeArrow.dataset.flight === 'high' ? 'high' : 'low';
+        flightBtn.style.display = (!istDuell && isBallTarget) ? 'inline-flex' : 'none';
+        flightBtn.innerHTML = translations[LANG].flightNames[flight];
+        flightBtn.classList.toggle('active-toggle', flight === 'high');
+        footBtn.style.display = (isAnimMode && !istDuell && canDribble && activeArrow.dataset.withBall === 'true') ? 'inline-flex' : 'none';
+        footBtn.innerHTML = translations[LANG].footNames[activeArrow.dataset.foot || 'auto'] || translations[LANG].footNames.auto;
     }
 }
 /* Ein Tipp auf das leere Feld hebt die Auswahl auf - ausser bei Toren, Netzen
@@ -1762,6 +2089,28 @@ withBallBtn.addEventListener('click', () => {
     if(!activeArrow) return;
     activeArrow.dataset.withBall = activeArrow.dataset.withBall === 'true' ? 'false' : 'true';
     withBallBtn.classList.toggle('active-toggle', activeArrow.dataset.withBall === 'true');
+    applyArrowVisual(activeArrow);   // Welle an/aus
+    updateButtonVisibility();        // Fuss-Knopf ein-/ausblenden
+});
+flightBtn.addEventListener('click', () => {
+    if(!activeArrow) return;
+    activeArrow.dataset.flight = activeArrow.dataset.flight === 'high' ? 'low' : 'high';
+    applyArrowVisual(activeArrow);
+    updateButtonVisibility();
+});
+footBtn.addEventListener('click', () => {
+    if(!activeArrow) return;
+    const order = ['auto', 'right', 'left'];
+    const cur = activeArrow.dataset.foot || 'auto';
+    activeArrow.dataset.foot = order[(order.indexOf(cur) + 1) % order.length];
+    updateButtonVisibility();
+});
+duelBtn.addEventListener('click', () => {
+    if(!isDuelable(activePlayer)) return;
+    if(duelSource){ duelAbbrechen(); return; }
+    duelSource = activePlayer;
+    duelBtn.classList.add('active-toggle');
+    showToast(translations[LANG].msgDuelPick);
 });
 paceBtn.addEventListener('click', () => {
     if(!activeArrow) return;
@@ -1834,7 +2183,18 @@ function setCenter(el, x, y){
 function easeInOutQuad(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; }
 function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 
+function animateDuel(arrow){
+    return new Promise(resolve => {
+        const a = findByOid(arrow.dataset.targetOid), b = findByOid(arrow.dataset.withOid);
+        if(!a || !b){ resolve(); return; }
+        const mult = (parseInt(animSpeedSlider.value, 10) || 100) / 100;
+        const dauer = Math.max(600, 1500 / mult);
+        a.classList.add('duel-blink'); b.classList.add('duel-blink');
+        setTimeout(() => { a.classList.remove('duel-blink'); b.classList.remove('duel-blink'); resolve(); }, dauer);
+    });
+}
 function animateArrow(arrow){
+    if(arrow.dataset.kind === 'duel') return animateDuel(arrow);
     return new Promise(resolve => {
         const tgt = findByOid(arrow.dataset.targetOid);
         const pts = getArrowPixelPoints(arrow);
@@ -1854,11 +2214,13 @@ function animateArrow(arrow){
         }
         if(total < 2){ resolve(); return; }
         const isShot = tgt.classList.contains('ball');
+        const isHigh = isShot && arrow.dataset.flight === 'high';
         const mult = parseInt(animSpeedSlider.value, 10) / 100;
         const paceMult = { slow: 0.55, normal: 1, fast: 1.7 }[arrow.dataset.pace || 'normal'] || 1;
-        const speed = (isShot ? 450 : 170) * mult * paceMult; // Pixel pro Sekunde: Schuss deutlich schneller, Tempo pro Pfeil
-        const duration = Math.max(250, total / speed * 1000);
-        const ease = isShot ? easeOutCubic : easeInOutQuad;
+        // Pixel pro Sekunde: Schuss deutlich schneller, hoher Ball etwas langsamer (Flugzeit), Tempo pro Pfeil
+        const speed = (isShot ? (isHigh ? 320 : 450) : 170) * mult * paceMult;
+        const duration = Math.max(isHigh ? 500 : 250, total / speed * 1000);
+        const ease = isHigh ? (t => t) : (isShot ? easeOutCubic : easeInOutQuad);
         function pointAt(frac){
             const target = frac * total;
             let i = 1;
@@ -1884,13 +2246,72 @@ function animateArrow(arrow){
             }
         }
 
+        function tangentAt(frac){
+            const a = pointAt(Math.max(0, frac - 0.01)), b = pointAt(Math.min(1, frac + 0.01));
+            const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
+            return { x: dx / l, y: dy / l };
+        }
+        /* Ballfuehrender Fuss: +1 = rechts, -1 = links. "auto" nimmt vor jeder
+           Kurve den aeusseren Fuss - so wechselt der Ball beim Slalom von selbst
+           die Seite. Der Wechsel wird weich eingeblendet. */
+        const footMode = arrow.dataset.foot || 'auto';
+        let side = footMode === 'left' ? -1 : 1, sideVal = side, lastNow = null;
+        const look = Math.min(0.3, 45 / total);   // rund 45 px Vorausschau
+
+        // Hoher Ball: Ball steigt auf und wird groesser, der Schatten bleibt am Boden
+        let shadow = null, lift = 0;
+        if(isHigh){
+            lift = Math.min(70, Math.max(18, total * 0.22));
+            shadow = document.createElement('div');
+            shadow.className = 'ball-shadow';
+            shadow.style.width = tgt.offsetWidth + 'px';
+            shadow.style.height = (tgt.offsetWidth * 0.45) + 'px';
+            field.appendChild(shadow);
+            tgt.classList.add('in-flight');
+        }
+        function aufraeumen(){
+            if(shadow){ shadow.remove(); shadow = null; }
+            if(isHigh){ tgt.style.transform = ''; tgt.classList.remove('in-flight'); }
+        }
+
         const t0 = performance.now();
         function frame(now){
-            let p = (now - t0) / duration; if(p > 1) p = 1;
-            const pos = pointAt(ease(p));
-            setCenter(tgt, pos.x, pos.y);
-            if(ballEl) setCenter(ballEl, pos.x + ballOffset.x, pos.y + ballOffset.y);
-            if(p < 1) requestAnimationFrame(frame); else resolve();
+            try {
+                let p = (now - t0) / duration; if(p > 1) p = 1;
+                const e = ease(p);
+                const pos = pointAt(e);
+                if(isHigh){
+                    const h = 4 * p * (1 - p);   // Flugparabel 0 -> 1 -> 0
+                    setCenter(tgt, pos.x, pos.y - lift * h);
+                    tgt.style.transform = 'scale(' + (1 + 0.6 * h).toFixed(3) + ')';
+                    shadow.style.left = (pos.x - shadow.offsetWidth / 2) + 'px';
+                    shadow.style.top = (pos.y + tgt.offsetHeight * 0.3 - shadow.offsetHeight / 2) + 'px';
+                    shadow.style.opacity = (0.95 - 0.45 * h).toFixed(2);
+                    shadow.style.transform = 'scale(' + (1 - 0.3 * h).toFixed(3) + ')';
+                } else {
+                    setCenter(tgt, pos.x, pos.y);
+                }
+                if(ballEl){
+                    const tan = tangentAt(e);
+                    if(footMode === 'auto'){
+                        const ahead = tangentAt(Math.min(1, e + look));
+                        const cross = tan.x * ahead.y - tan.y * ahead.x;
+                        if(cross > 0.12) side = -1;        // Rechtskurve -> linker (aeusserer) Fuss
+                        else if(cross < -0.12) side = 1;   // Linkskurve  -> rechter Fuss
+                    }
+                    const dt = lastNow == null ? 0 : (now - lastNow) / 1000; lastNow = now;
+                    sideVal += (side - sideVal) * Math.min(1, dt * 7);
+                    const r = tgt.offsetWidth / 2, br = ballEl.offsetWidth / 2;
+                    const fwd = r + br * 0.5, lat = r * 0.6 * sideVal;
+                    // rechte Seite der Laufrichtung (y zeigt nach unten): (-ty, tx)
+                    const bx = pos.x + tan.x * fwd - tan.y * lat, by = pos.y + tan.y * fwd + tan.x * lat;
+                    const blend = Math.min(1, p / 0.18);   // Ball am Anfang sanft an den Fuss holen
+                    setCenter(ballEl,
+                        (pos.x + ballOffset.x) * (1 - blend) + bx * blend,
+                        (pos.y + ballOffset.y) * (1 - blend) + by * blend);
+                }
+                if(p < 1) requestAnimationFrame(frame); else { aufraeumen(); resolve(); }
+            } catch(err){ aufraeumen(); console.error(err); resolve(); }
         }
         requestAnimationFrame(frame);
     });
@@ -1941,6 +2362,9 @@ async function playAnimation(noLoop){
         showToast(translations[LANG].msgAnimError);
     } finally {
         field.querySelectorAll('.arrow-container.anim-current').forEach(a => a.classList.remove('anim-current'));
+        field.querySelectorAll('.ball-shadow').forEach(el => el.remove());
+        field.querySelectorAll('.player.in-flight').forEach(el => { el.classList.remove('in-flight'); el.style.transform = ''; });
+        field.querySelectorAll('.player.duel-blink').forEach(el => el.classList.remove('duel-blink'));
         field.classList.remove('anim-playing');
         isAnimating = false;
         stopRequested = false;
@@ -2021,6 +2445,17 @@ function drawFieldFrame(g, W, H, assets){
     g.fillRect(0, 0, W, H);
     if(assets.fieldImg) g.drawImage(assets.fieldImg, 0, 0, W, H);
     g.drawImage(canvas, 0, 0, W, H); // gemalte Linien
+    // Schatten hoher Baelle
+    field.querySelectorAll('.ball-shadow').forEach(sh => {
+        const sc = parseFloat((sh.style.transform.match(/scale\(([\d.]+)\)/) || [])[1]) || 1;
+        const w = sh.offsetWidth * sc, h = sh.offsetHeight * sc;
+        g.save();
+        g.globalAlpha = 0.38 * (parseFloat(sh.style.opacity) || 1);
+        g.fillStyle = '#000';
+        g.beginPath(); g.ellipse(sh.offsetLeft + sh.offsetWidth / 2, sh.offsetTop + sh.offsetHeight / 2, w / 2, h / 2, 0, 0, Math.PI * 2); g.fill();
+        g.restore();
+    });
+    const blinkAn = Math.floor(performance.now() / 170) % 2 === 0;
     field.querySelectorAll('.player').forEach(el => {
         const x = el.offsetLeft, y = el.offsetTop, w = el.offsetWidth, h = el.offsetHeight;
         if(el.classList.contains('item-obj')){
@@ -2052,7 +2487,12 @@ function drawFieldFrame(g, W, H, assets){
         }
         // runde Objekte: Spieler, Gegner, Bälle, Pucks
         const cs = getComputedStyle(el);
-        g.beginPath(); g.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2 - 1, 0, Math.PI * 2);
+        const sk = parseFloat(((el.style.transform || '').match(/scale\(([\d.]+)\)/) || [])[1]) || 1;
+        if(el.classList.contains('duel-blink') && blinkAn){
+            g.beginPath(); g.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2 + 3, 0, Math.PI * 2);
+            g.lineWidth = 5; g.strokeStyle = '#ff1744'; g.stroke();
+        }
+        g.beginPath(); g.arc(x + w / 2, y + h / 2, (Math.min(w, h) / 2 - 1) * sk, 0, Math.PI * 2);
         g.fillStyle = cs.backgroundColor; g.fill();
         g.lineWidth = 2; g.strokeStyle = cs.borderTopColor || '#fff'; g.stroke();
         const txt = el.innerText || '';
@@ -2243,7 +2683,7 @@ const translations = {
         obTitle: 'Willkommen bei TacticBoard!',
         obText: `<strong>1. Aufstellen:</strong> 🔴 und 🔵 erstellen Spieler und Gegner. Kurzes Tippen auf das Ball-, Tor- oder Geräte-Symbol erstellt das zuletzt gewählte Objekt – <u>gedrückt halten</u> öffnet die volle Auswahl (Plättchen, Stangen, Leiter, Dummys, verschiedene Tore). <br><br>
         <strong>2. Pfeile:</strong> Objekt antippen → "➦ Pfeil". Ziehe einfach an der Pfeilspitze. "＋ Punkt" erzeugt Kurven und Kreise. <br><br>
-        <strong>3. Animation:</strong> 🎬 einschalten, den Pfeilen Schritte und Tempo zuweisen, mit ▶ abspielen – 🔁 wiederholt endlos, 🎞️ speichert den Spielzug als GIF. <br><br>
+        <strong>3. Animation:</strong> 🎬 einschalten, den Pfeilen Schritte und Tempo zuweisen, mit ▶ abspielen – 🔁 wiederholt endlos, 🎞️ speichert den Spielzug als GIF. Mit ✏️ kannst du Wege auch frei malen: Ein Strich, der auf einem Spieler beginnt, wird zum Laufweg (mit Ball: Dribbling), ein Strich vom Ball zum Pass. Pass antippen → flach oder hoch. ⚔️ Zweikampf: Spieler wählen, dann den Gegenspieler antippen. <br><br>
         <strong>4. Sichern & Teilen:</strong> 💾 speichert die Taktik, 📤 exportiert sie als Datei für andere Geräte oder Co-Trainer.`,
         obClose: "Los geht's!",
         obReopen: 'Kurzanleitung',
@@ -2261,6 +2701,13 @@ const translations = {
         stopBtn: '⏹ Stopp',
         gifBtn: '🎞️ Als GIF speichern',
         paceNames: { slow:'🚶 Langsam', normal:'🏃 Normal', fast:'💨 Sprint' },
+        duelBtn: '⚔️ Zweikampf',
+        msgDuelPick: 'Jetzt den Gegenspieler antippen',
+        msgDuelCreated: s => 'Zweikampf als Schritt ' + s + ' angelegt',
+        flightNames: { low:'〰️ Flach', high:'⤴️ Hoch' },
+        footNames: { auto:'🦶 Fuß: auto', right:'🦶 Fuß: rechts', left:'🦶 Fuß: links' },
+        pathKinds: { run:'Laufweg', dribble:'Dribbling', pass:'Pass' },
+        msgPathCreated: (art, s) => art + ' als Schritt ' + s + ' angelegt',
         msgGifCreating: 'GIF wird aufgenommen…',
         msgGifDone: 'GIF gespeichert!',
         msgGifUnavailable: 'GIF-Export nicht verfügbar (Internetverbindung erforderlich).',
@@ -2363,12 +2810,19 @@ const translations = {
         obTitle: 'Welcome to TacticBoard!',
         obText: `<strong>1. Set up:</strong> 🔴 and 🔵 create players and opponents. A short tap on the ball, goal or equipment icon creates the last selected object – <u>press and hold</u> opens the full selection (flat markers, poles, ladder, dummies, different goals). <br><br>
         <strong>2. Arrows:</strong> Tap an object → "➦ Arrow". Simply drag the arrowhead. "＋ Point" creates curves and circles. <br><br>
-        <strong>3. Animation:</strong> Enable 🎬, assign steps and pace to the arrows, play with ▶ – 🔁 loops endlessly, 🎞️ saves the play as a GIF. <br><br>
+        <strong>3. Animation:</strong> Enable 🎬, assign steps and pace to the arrows, play with ▶ – 🔁 loops endlessly, 🎞️ saves the play as a GIF. With ✏️ you can also draw paths freehand: a line starting on a player becomes a run (with the ball: a dribble), a line from the ball becomes a pass. Tap a pass → low or high. ⚔️ Duel: select a player, then tap the opponent. <br><br>
         <strong>4. Save & share:</strong> 💾 saves the tactic, 📤 exports it as a file for other devices or fellow coaches.`,
         obClose: "Let's go!",
         obReopen: 'Quick guide',
         stepLabel: 'Step:',
         withBallBtn: '⚽ With ball',
+        duelBtn: '⚔️ Duel',
+        msgDuelPick: 'Now tap the opponent',
+        msgDuelCreated: s => 'Duel added as step ' + s,
+        flightNames: { low:'〰️ Low', high:'⤴️ High' },
+        footNames: { auto:'🦶 Foot: auto', right:'🦶 Foot: right', left:'🦶 Foot: left' },
+        pathKinds: { run:'Run', dribble:'Dribble', pass:'Pass' },
+        msgPathCreated: (art, s) => art + ' added as step ' + s,
         playBtn: '▶ Play',
         resetAnimBtn: '⏮ Reset',
         animSpeed: 'Overall speed:',
@@ -2446,6 +2900,8 @@ function applyLanguage(lang){
     closeAboutBtn.textContent = t.closeBtn;
     stepLabelText.textContent = t.stepLabel;
     withBallBtn.innerHTML = t.withBallBtn;
+    duelBtn.innerHTML = t.duelBtn;
+    updateButtonVisibility();   // Flug- und Fuss-Knopf in der neuen Sprache
     resetAnimBtn.innerHTML = t.resetAnimBtn;
     animSpeedLabel.textContent = t.animSpeed;
     animToggleBtn.innerHTML = t.animToggleBtn;
@@ -2566,6 +3022,10 @@ function itemPercent(el, achse){
 }
 
 function itemGroesseAendern(faktor){
+    if(activePlayer && equipType(activePlayer)){
+        applyEquipScale(activePlayer, (parseFloat(activePlayer.dataset.scale || '1') || 1) * faktor);
+        return;
+    }
     if(!activePlayer || !activePlayer.classList.contains('item-obj')) return;
     const ar = itemAspect(activePlayer.dataset.variant || 'goal');
     const w = Math.max(8, Math.min(90, itemPercent(activePlayer, 'width') * faktor));
@@ -2591,6 +3051,7 @@ function itemAusrichten(){
 }
 
 function itemZuruecksetzen(){
+    if(activePlayer && equipType(activePlayer)){ applyEquipScale(activePlayer, 1); return; }
     if(!activePlayer || !activePlayer.classList.contains('item-obj')) return;
     const ar = itemAspect(activePlayer.dataset.variant || 'goal');
     activePlayer.style.width = ITEM_DEFAULT_W + '%';
@@ -2658,9 +3119,11 @@ function refreshTacticSelect(){
    automatischen Sichern benutzt - eine Quelle, damit beide nie auseinanderlaufen. */
 function brettLesen(){
     const players = [];
-    field.querySelectorAll('.player').forEach(p => players.push({ className: p.className, text: p.dataset.text || p.innerText, left: p.style.left, top: p.style.top, width: p.style.width, height: p.style.height, color: p.dataset.color || p.style.color, oid: p.dataset.oid, variant: p.dataset.variant || '', rotation: p.dataset.rotation || '' }));
+    // Waehrend der Animation traegt die Klasse Zusatzmarken (Blinken, Flug) - die gehoeren nicht in die Datei
+    const klasse = p => p.className.split(/\s+/).filter(c => c && c !== 'active' && c !== 'duel-blink' && c !== 'in-flight').join(' ');
+    field.querySelectorAll('.player').forEach(p => players.push({ className: klasse(p), text: p.dataset.text || p.innerText, left: p.style.left, top: p.style.top, width: p.style.width, height: p.style.height, color: p.dataset.color || p.style.color, oid: p.dataset.oid, variant: p.dataset.variant || '', rotation: p.dataset.rotation || '', scale: p.dataset.scale || '' }));
     const arrows = [];
-    field.querySelectorAll('.arrow-container').forEach(a => arrows.push({ points: JSON.parse(a.dataset.points || '[]'), color: a.dataset.color || '', dashed: a.dataset.dashed || 'false', targetOid: a.dataset.targetOid || '', step: a.dataset.step || '1', withBall: a.dataset.withBall || 'false', pace: a.dataset.pace || 'normal' }));
+    field.querySelectorAll('.arrow-container').forEach(a => arrows.push(arrowData(a)));
     /* Nach dem Abspielen (oder mittendrin) stehen die Spieler auf End- bzw.
        Zwischenpositionen. Gespeichert wird immer die Ausgangsaufstellung -
        sonst liefe die Animation nach dem Laden vom falschen Ort los. */
@@ -2704,12 +3167,12 @@ function brettAnwenden(t){
     clearHistory(); clearAnimBaseline();
     t.players.forEach(p => {
         const isSelectableObj = !p.className.includes('cone') && !p.className.includes('disc') && !p.className.includes('pole') && !p.className.includes('dummy');
-        const el = createObject(p.className, p.text, p.left, p.top, sizePercentFor(p.className), isSelectableObj, p.width, p.height, p.color, p.oid, p.variant, p.rotation);
+        const el = createObject(p.className, p.text, p.left, p.top, sizePercentFor(p.className), isSelectableObj, p.width, p.height, p.color, p.oid, p.variant, p.rotation, p.scale);
         if(p.className.includes('player') && !p.className.includes('ball') && !p.className.includes('cone') && !p.className.includes('item-obj') && !p.className.includes('disc') && !p.className.includes('pole') && !p.className.includes('dummy')) setupDoubleClickToggle(el);
     });
     t.arrows.forEach(a => {
-        const ptsPercent = (a.points && a.points.length >= 2) ? a.points : legacyArrowPoints(a);
-        buildArrowOnField(ptsPercent, a.color, a.dashed === 'true', a.targetOid, a.step, a.withBall === 'true', a.pace);
+        const ptsPercent = a.kind === 'duel' ? [] : ((a.points && a.points.length >= 2) ? a.points : legacyArrowPoints(a));
+        buildArrowFromData(a, ptsPercent);
     });
     
     if (typeof t.drawing === 'string' && t.drawing.startsWith('data:image')) {
@@ -3207,7 +3670,8 @@ function sanitizeTactic(t, erlaubeLeer){
             color: cleanColor(p.color),
             oid: String(p.oid || '').replace(/[^\w-]/g, '').slice(0, 40),
             variant: String(p.variant || '').slice(0, 20).replace(/[^a-z]/gi, ''),
-            rotation: isFinite(parseFloat(p.rotation)) ? String(parseFloat(p.rotation) % 360) : ''
+            rotation: isFinite(parseFloat(p.rotation)) ? String(parseFloat(p.rotation) % 360) : '',
+            scale: isFinite(parseFloat(p.scale)) ? String(Math.max(0.5, Math.min(4, parseFloat(p.scale)))) : ''
         };
     }).filter(Boolean);
     if(players.length === 0 && !erlaubeLeer) return null;
@@ -3220,7 +3684,9 @@ function sanitizeTactic(t, erlaubeLeer){
            der App ebenso wie beim Import einer Taktik-Datei. Beide Formen
            werden angenommen, heraus kommt immer [x, y]. */
         const zahl = v => Math.max(-20, Math.min(120, +v));
-        const pts = (Array.isArray(a.points) ? a.points : []).slice(0, 12)
+        const istDuell = a.kind === 'duel';
+        // gemalte Wege haben bis zu 60 Punkte
+        const pts = (Array.isArray(a.points) ? a.points : []).slice(0, 60)
             .map(pt => {
                 if(Array.isArray(pt) && pt.length >= 2 && isFinite(pt[0]) && isFinite(pt[1])) return [zahl(pt[0]), zahl(pt[1])];
                 if(pt && typeof pt === 'object' && isFinite(pt.x) && isFinite(pt.y)) return [zahl(pt.x), zahl(pt.y)];
@@ -3230,7 +3696,9 @@ function sanitizeTactic(t, erlaubeLeer){
         /* Sehr alte Dateien kennen noch keine Punkte, sondern Lage und Winkel.
            Diese Angaben bleiben erhalten, brettAnwenden rechnet sie um. */
         const alt = {};
-        if(pts.length < 2){
+        if(istDuell){
+            if(!a.targetOid || !a.withOid) return null;
+        } else if(pts.length < 2){
             ['left', 'top', 'width', 'angle', 'curve'].forEach(k => {
                 if(a[k] !== undefined && isFinite(parseFloat(a[k]))) alt[k] = String(parseFloat(a[k]));
             });
@@ -3242,7 +3710,11 @@ function sanitizeTactic(t, erlaubeLeer){
             targetOid: String(a.targetOid || '').replace(/[^\w-]/g, '').slice(0, 40),
             step: String(Math.max(1, Math.min(20, parseInt(a.step, 10) || 1))),
             withBall: a.withBall === 'true' || a.withBall === true ? 'true' : 'false',
-            pace: ALLOWED_PACE.indexOf(a.pace) !== -1 ? a.pace : 'normal'
+            pace: ALLOWED_PACE.indexOf(a.pace) !== -1 ? a.pace : 'normal',
+            flight: a.flight === 'high' ? 'high' : 'low',
+            foot: (a.foot === 'left' || a.foot === 'right') ? a.foot : 'auto',
+            kind: istDuell ? 'duel' : '',
+            withOid: istDuell ? String(a.withOid || '').replace(/[^\w-]/g, '').slice(0, 40) : ''
         });
     }).filter(Boolean);
 
