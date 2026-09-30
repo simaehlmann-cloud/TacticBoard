@@ -644,7 +644,8 @@ const paceBtn = document.getElementById('pace-btn');
 const duelBtn = document.getElementById('duel-btn');
 const flightBtn = document.getElementById('flight-btn');
 const footBtn = document.getElementById('foot-btn');
-let duelSource = null;   // Spieler, der auf seinen Zweikampf-Gegner wartet
+let duelSource = null;
+let letzterPass = null;  // zuletzt gemalter Pass: Passgeber und Schritt   // Spieler, der auf seinen Zweikampf-Gegner wartet
 const loopBtn = document.getElementById('loop-btn');
 const exportGifBtn = document.getElementById('export-gif-btn');
 const animToggleBtn = document.getElementById('anim-toggle-btn');
@@ -1720,6 +1721,7 @@ function buildArrowOnField(pointsPercent, color, dashed, targetOid, step, withBa
     arrow.dataset.pace = pace || 'normal';
     arrow.dataset.flight = opts.flight === 'high' ? 'high' : 'low';
     arrow.dataset.foot = (opts.foot === 'left' || opts.foot === 'right') ? opts.foot : 'auto';
+    if(opts.afterPass === true || opts.afterPass === 'true') arrow.dataset.afterPass = 'true';
     if(opts.kind === 'duel'){
         arrow.dataset.kind = 'duel';
         arrow.dataset.withOid = opts.withOid || '';
@@ -1882,7 +1884,7 @@ function projizierteLagen(){
         const pts = getArrowPixelPoints(a);
         if(pts.length < 2) return;
         const s = pos.get(tgt);
-        pos.starts.push({ tgt, step: parseInt(a.dataset.step, 10) || 1, start: { x: s.x, y: s.y } });
+        pos.starts.push({ arrow: a, tgt, step: parseInt(a.dataset.step, 10) || 1, start: { x: s.x, y: s.y } });
         const end = { x: pts[pts.length - 1].x - pts[0].x + s.x, y: pts[pts.length - 1].y - pts[0].y + s.y };
         if(a.dataset.withBall === 'true' && !tgt.classList.contains('ball')){
             const b = naechsterBall(pos, s, field.clientWidth * 0.2);
@@ -1952,18 +1954,44 @@ function strichZuLaufweg(stroke){
     ]);
     const art = istBall ? 'pass' : (mitBall ? 'dribble' : 'run');
     let step = String(naechsterSchritt());
-    let mitPass = false;
-    /* Pass und direkt loslaufen: Hat genau dieser Spieler im letzten Schritt
-       den Ball gespielt, laeuft er im selben Schritt los - beim Abspielen
-       startet sein Lauf automatisch erst nach dem Pass (playAnimation). */
-    if(art === 'run'){
-        const letzter = parseInt(step, 10) - 1;
-        const pass = pos.starts.find(x => x.step === letzter && x.tgt.classList.contains('ball')
-            && Math.hypot(x.start.x - tgtPos.x, x.start.y - tgtPos.y) < tgt.offsetWidth * 1.3);
-        const schonDran = pos.starts.some(x => x.step === letzter && x.tgt === tgt);
-        if(pass && !schonDran){ step = String(letzter); mitPass = true; }
+    let mitPass = false, laufNachPass = null;
+    /* Pass und direkt loslaufen - egal in welcher Reihenfolge gemalt wird:
+       Der Laufweg des Passgebers bekommt denselben Schritt wie der Pass und
+       wird markiert (afterPass). Beim Abspielen startet er dann erst, wenn
+       der Ball gespielt ist; alle anderen laufen mit dem Pass los. */
+    const nahDran = (a, b, el) => Math.hypot(a.x - b.x, a.y - b.y) < Math.max(el.offsetWidth * 1.6, 40);
+    const letzteArrowVon = el => { let r = null; pos.starts.forEach(x => { if(x.tgt === el && (!r || x.step >= r.step)) r = x; }); return r; };
+    if(art === 'pass'){
+        // Passgeber = Spieler, der am Ball steht (vor seinem eigenen Laufweg)
+        let passer = null, bestD = Infinity;
+        pos.forEach((pp, el) => {
+            if(el.classList.contains('ball')) return;
+            const lauf = letzteArrowVon(el);
+            const dort = (lauf && lauf.arrow.dataset.withBall !== 'true') ? lauf.start : pp;
+            const d = Math.hypot(dort.x - tgtPos.x, dort.y - tgtPos.y);
+            if(nahDran(dort, tgtPos, el) && d < bestD){ bestD = d; passer = el; }
+        });
+        if(passer){
+            const lauf = letzteArrowVon(passer);
+            // Laufweg schon gemalt? Dann Pass in dessen Schritt, Lauf startet nach dem Abspiel
+            if(lauf && lauf.arrow.dataset.withBall !== 'true' && !nahDran(pos.get(passer), tgtPos, passer)){
+                step = String(lauf.step);
+                laufNachPass = lauf.arrow;
+                mitPass = true;
+            }
+            letzterPass = { passer, step };
+        } else letzterPass = null;
+    } else if(art === 'run' && letzterPass && letzterPass.passer === tgt){
+        const lauf = letzteArrowVon(tgt);
+        if(!lauf || lauf.step < parseInt(letzterPass.step, 10)){
+            step = letzterPass.step; mitPass = true;
+        }
+        letzterPass = null;
+    } else if(art !== 'pass'){
+        letzterPass = null;
     }
-    const arrow = buildArrowOnField(pct, stroke.color, art === 'run', tgt.dataset.oid, step, art === 'dribble', 'normal', {});
+    const arrow = buildArrowOnField(pct, stroke.color, art === 'run', tgt.dataset.oid, step, art === 'dribble', 'normal', { afterPass: art === 'run' && mitPass });
+    if(laufNachPass){ laufNachPass.dataset.afterPass = 'true'; laufNachPass.dataset.step = step; applyArrowVisual(laufNachPass); }
     /* Der Verlauf enthaelt schon den Zeichen-Schnappschuss von startDraw -
        den ersetzen, damit Rueckgaengig den Weg entfernt statt einen leeren
        Zeichenstand herzustellen. */
@@ -1981,12 +2009,13 @@ function arrowData(a){
         points: pts, color: a.dataset.color || '', dashed: a.dataset.dashed || 'false',
         targetOid: a.dataset.targetOid || '', step: a.dataset.step || '1', withBall: a.dataset.withBall || 'false',
         pace: a.dataset.pace || 'normal', flight: a.dataset.flight || 'low', foot: a.dataset.foot || 'auto',
-        kind: a.dataset.kind || '', withOid: a.dataset.withOid || ''
+        kind: a.dataset.kind || '', withOid: a.dataset.withOid || '',
+        afterPass: a.dataset.afterPass === 'true' ? 'true' : ''
     };
 }
 function buildArrowFromData(a, pts){
     return buildArrowOnField(pts || a.points || [], a.color, a.dashed === 'true', a.targetOid, a.step, a.withBall === 'true', a.pace,
-        { flight: a.flight, foot: a.foot, kind: a.kind, withOid: a.withOid });
+        { flight: a.flight, foot: a.foot, kind: a.kind, withOid: a.withOid, afterPass: a.afterPass });
 }
 function legacyArrowPoints(a){
     const fw = field.clientWidth, fh = field.clientHeight;
@@ -2391,6 +2420,7 @@ async function playAnimation(noLoop){
                 const abspielZeit = 380 / ((parseInt(animSpeedSlider.value, 10) || 100) / 100);
                 const verzoegerung = a => {
                     if(a.dataset.kind === 'duel' || a.dataset.withBall === 'true') return 0;
+                    if(a.dataset.afterPass === 'true') return baelle.length ? abspielZeit : 0;
                     const t = findByOid(a.dataset.targetOid);
                     if(!t || t.classList.contains('ball')) return 0;
                     const c = centerOf(t);
@@ -3771,6 +3801,7 @@ function sanitizeTactic(t, erlaubeLeer){
             flight: a.flight === 'high' ? 'high' : 'low',
             foot: (a.foot === 'left' || a.foot === 'right') ? a.foot : 'auto',
             kind: istDuell ? 'duel' : '',
+            afterPass: (a.afterPass === 'true' || a.afterPass === true) ? 'true' : '',
             withOid: istDuell ? String(a.withOid || '').replace(/[^\w-]/g, '').slice(0, 40) : ''
         });
     }).filter(Boolean);
