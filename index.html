@@ -109,6 +109,19 @@ html, body {
     border:1px solid rgba(255,255,255,0.35);
     box-shadow:0 2px 6px rgba(0,0,0,0.4);
 }
+/* Abspielen im Vollbild: gleiche Optik wie der Vollbild-Knopf, oben links.
+   Nur im Vollbild und nur, wenn es Pfeile gibt. */
+#fs-play-btn {
+    position:absolute; left:8px; top:8px; z-index:30;
+    width:42px; height:42px; padding:0; min-width:0;
+    display:none; align-items:center; justify-content:center;
+    font-size:18px; line-height:1; border-radius:10px;
+    background:rgba(0,0,0,0.55); color:#fff;
+    border:1px solid rgba(255,255,255,0.35);
+    box-shadow:0 2px 6px rgba(0,0,0,0.4);
+}
+body.fullscreen-board #zoom-wrapper.has-arrows #fs-play-btn { display:flex; }
+#fs-play-btn.playing { background:rgba(230,57,70,0.85); }
 body.fullscreen-board .header,
 body.fullscreen-board #setup-controls { display:none; }
 body.fullscreen-board .container { padding-top:8px; }
@@ -395,6 +408,7 @@ body.landscape-fit footer {
 
     <div id="zoom-wrapper">
         <button id="fullscreen-btn" title="Vollbild">⛶</button>
+        <button id="fs-play-btn" title="Abspielen">▶</button>
         <div id="football-field">
             <canvas id="drawing-canvas"></canvas>
         </div>
@@ -626,6 +640,7 @@ const clearAllBtn = document.getElementById('clear-all-btn');
 const sizeSlider = document.getElementById('size-slider');
 const zoomWrapper = document.getElementById('zoom-wrapper');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
+const fsPlayBtn = document.getElementById('fs-play-btn');
 const legalModal = document.getElementById('legal-modal');
 const legalTitle = document.getElementById('legal-title');
 const legalBody = document.getElementById('legal-body');
@@ -2361,6 +2376,8 @@ function animateArrow(arrow, verzoegerung){
         const t0 = performance.now();
         function frame(now){
             try {
+                // Stopp-Knopf: sofort anhalten statt den Schritt zu Ende zu laufen
+                if(stopRequested){ aufraeumen(); resolve(); return; }
                 let p = (now - t0) / duration; if(p > 1) p = 1;
                 const e = ease(p);
                 const pos = pointAt(e);
@@ -2414,6 +2431,7 @@ async function playAnimation(noLoop){
     if(arrows.length === 0){ showToast(translations[LANG].msgNoArrows); return; }
     isAnimating = true; stopRequested = false;
     playBtn.innerHTML = translations[LANG].stopBtn;
+    if(typeof syncFsPlay === 'function') syncFsPlay();
     selectPlayer(null);
     /* Ausgangsaufstellung merken. Objekte, die erst nach dem letzten
        Abspielen dazugekommen sind (z.B. ein neuer Ball), fehlten bisher in
@@ -2472,6 +2490,7 @@ async function playAnimation(noLoop){
         isAnimating = false;
         stopRequested = false;
         playBtn.innerHTML = translations[LANG].playBtn;
+        syncFsPlay();
     }
 }
 playBtn.addEventListener('click', () => {
@@ -3012,6 +3031,7 @@ function applyLanguage(lang){
     stepLabelText.textContent = t.stepLabel;
     withBallBtn.innerHTML = t.withBallBtn;
     duelBtn.innerHTML = t.duelBtn;
+    syncFsPlay();
     updateButtonVisibility();   // Flug- und Fuss-Knopf in der neuen Sprache
     resetAnimBtn.innerHTML = t.resetAnimBtn;
     animSpeedLabel.textContent = t.animSpeed;
@@ -3190,6 +3210,25 @@ function setFullscreenBoard(an){
 fullscreenBtn.addEventListener('click', () => {
     setFullscreenBoard(!document.body.classList.contains('fullscreen-board'));
 });
+/* Abspielen im Vollbild: ein Tipp spielt von der Ausgangsaufstellung ab,
+   waehrend der Animation stoppt er sie. Zuruecksetzen ist eingebaut, weil
+   im Vollbild der Zurueck-Knopf nicht zu sehen ist. */
+fsPlayBtn.addEventListener('click', () => {
+    if(isAnimating){ stopRequested = true; return; }
+    if(isDrawingMode) return;
+    restoreBaseline();
+    playAnimation();
+    syncFsPlay();
+});
+function syncFsPlay(){
+    zoomWrapper.classList.toggle('has-arrows', !!field.querySelector('.arrow-container'));
+    fsPlayBtn.textContent = isAnimating ? '⏹' : '▶';
+    fsPlayBtn.classList.toggle('playing', isAnimating);
+    fsPlayBtn.title = translations[LANG][isAnimating ? 'stopBtn' : 'playBtn'].replace(/^\S+\s*/, '');
+}
+// Pfeile kommen und gehen auf vielen Wegen (Malen, Laden, Loeschen, Rueckgaengig) -
+// ein Beobachter haelt die Sichtbarkeit des Knopfs zuverlaessig aktuell
+new MutationObserver(syncFsPlay).observe(field, { childList: true });
 
 /* Frueher lief der Regler ueber transform:scale(). Eine Transformation aendert
    aber das Layout nicht - das Feld belegte weiter seine volle Hoehe, und ein
