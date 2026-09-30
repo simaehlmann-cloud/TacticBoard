@@ -169,7 +169,13 @@ button:disabled { opacity:0.35; cursor:not-allowed; filter:none; }
 .player.ball { width:7%; background:#fff; color:#000; border:1px solid #000; font-size: 14px; }
 .player.ball.handball { background: #e63946; color: #fff; border: 1px dashed #fff; font-size: 10px; width: 6%; }
 .player.puck { width:6%; background:#000; color:#fff; border-radius:50%; font-size: 10px; }
-.player.cone { background:transparent; border:none; font-size:24px; width:8%; box-shadow: none; font-weight: normal; }
+.player.cone { background:transparent; border:none; width:4.5%; box-shadow: none; font-weight: normal; border-radius:0; }
+.player.cone svg { width:100%; height:100%; display:block; pointer-events:none; }
+/* Fussball, Basketball, Volleyball: das Symbol fuellt den ganzen Kreis statt
+   klein in einer weissen Scheibe zu sitzen. Die Schriftgroesse folgt der
+   Feldbreite (--ball-font, gesetzt per ResizeObserver). */
+.player.ball:not(.handball):not(.puck) { background:transparent; border-color:transparent; box-shadow:none; font-size:var(--ball-font, 14px); line-height:1; overflow:visible; }
+.player.ball:not(.handball):not(.puck).active { box-shadow:0 0 0 2px #ffeb3b, 0 0 12px #ffeb3b; }
 
 /* TRAININGSGERÄTE */
 .player.disc, .player.pole, .player.dummy { background:transparent; border:none; border-radius:0; box-shadow:none; }
@@ -547,6 +553,7 @@ body.landscape-fit footer {
       <button class="equip-btn" data-equip="pole"><span class="equip-ico"></span><span class="equip-name"></span></button>
       <button class="equip-btn" data-equip="ladder"><span class="equip-ico"></span><span class="equip-name"></span></button>
       <button class="equip-btn" data-equip="dummy"><span class="equip-ico"></span><span class="equip-name"></span></button>
+      <button class="equip-btn" data-equip="bench"><span class="equip-ico"></span><span class="equip-name"></span></button>
     </div>
   </div>
 </div>
@@ -716,6 +723,10 @@ function sizePercentFor(className){
    liegt aber in Geraetepixeln (devicePixelRatio). Sonst sind Linien auf
    modernen Displays sichtbar weich. */
 let canvasDpr = 1;
+/* Emoji-Baelle: Symbol so gross wie der Kreis (7 % der Feldbreite) */
+if(window.ResizeObserver){
+    new ResizeObserver(() => { field.style.setProperty('--ball-font', (field.clientWidth * 0.07 * 0.92).toFixed(1) + 'px'); }).observe(field);
+}
 function canvasW(){ return canvas.width / canvasDpr; }
 function canvasH(){ return canvas.height / canvasDpr; }
 function clearCanvasAll(){
@@ -1085,7 +1096,8 @@ function applyLabelSize(el){
 
 /* Huetchen und Trainingsgeraete lassen sich vergroessern. Gespeichert wird
    ein Faktor (dataset.scale); Breite und beim Huetchen die Schrift folgen daraus. */
-const EQUIP_BASE = { cone: 8, disc: 6, pole: 2.5, dummy: 5 };
+const EQUIP_BASE = { cone: 4.5, disc: 6, pole: 2.5, dummy: 5 };
+const CONE_SVG = '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M50 4 L95 94 Q50 102 5 94 Z" fill="currentColor" stroke="rgba(0,0,0,0.35)" stroke-width="4" stroke-linejoin="round"/><path d="M28 56 Q50 62 72 56" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="7" stroke-linecap="round"/></svg>';
 const EQUIP_SCALE_MIN = 0.5, EQUIP_SCALE_MAX = 4;
 function equipType(el){
     if(!el || !el.classList) return null;
@@ -1099,7 +1111,6 @@ function applyEquipScale(el, s){
     el.dataset.scale = +s.toFixed(3);
     el.style.width = (EQUIP_BASE[ty] * s).toFixed(2) + '%';
     el.style.height = '';
-    if(ty === 'cone') el.style.fontSize = (24 * s).toFixed(1) + 'px';
 }
 function equipFertig(el, scale){
     if(scale && isFinite(parseFloat(scale)) && parseFloat(scale) !== 1) applyEquipScale(el, parseFloat(scale));
@@ -1116,7 +1127,7 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
     if (hPercent) el.style.height = hPercent;
 
     if (className.includes('cone')) {
-        el.innerText = '▲'; 
+        el.innerHTML = CONE_SVG;
         el.style.color = objColor || getConeColor(currentSport);
         el.dataset.color = el.style.color;
         setupPercentDrag(el, sizePercent); field.appendChild(el); return equipFertig(el, scale);
@@ -1333,6 +1344,7 @@ const ITEM_SVG = {
     basket: { vb:'0 0 100 100', body:'<path d="M10,50 Q50,90 90,50" fill="none" stroke="#f4a261" stroke-width="6"/><line x1="20" y1="50" x2="80" y2="50" stroke="#f4a261" stroke-width="6"/><rect x="25" y="10" width="50" height="40" fill="none" stroke="#fff" stroke-width="6"/>' },
     net: { vb:'0 0 100 40', body:'<rect width="100" height="40" fill="none" stroke="#fff" stroke-width="4"/><line x1="0" y1="10" x2="100" y2="10" stroke="#ccc" stroke-width="2"/><line x1="0" y1="20" x2="100" y2="20" stroke="#ccc" stroke-width="2"/><line x1="0" y1="30" x2="100" y2="30" stroke="#ccc" stroke-width="2"/><line x1="10" y1="0" x2="10" y2="40" stroke="#ccc" stroke-width="2"/><line x1="30" y1="0" x2="30" y2="40" stroke="#ccc" stroke-width="2"/><line x1="50" y1="0" x2="50" y2="40" stroke="#ccc" stroke-width="2"/><line x1="70" y1="0" x2="70" y2="40" stroke="#ccc" stroke-width="2"/><line x1="90" y1="0" x2="90" y2="40" stroke="#ccc" stroke-width="2"/>' },
     smallnet: { vb:'0 0 100 52', body:'<rect x="2" y="2" width="5" height="48" rx="2" fill="#e8e8e8"/><rect x="93" y="2" width="5" height="48" rx="2" fill="#e8e8e8"/><rect x="7" y="6" width="86" height="26" fill="none" stroke="#fff" stroke-width="3"/><path d="M7 15 H93 M7 24 H93" stroke="#ccc" stroke-width="1.5" fill="none"/><path d="M20 6 V32 M33 6 V32 M46 6 V32 M59 6 V32 M72 6 V32 M85 6 V32" stroke="#ccc" stroke-width="1.5" fill="none"/>' },
+    bench: { vb:'0 0 200 56', body:'<rect x="2" y="2" width="196" height="52" rx="10" fill="#b0bec5" stroke="#37474f" stroke-width="3"/><rect x="2" y="2" width="196" height="14" rx="6" fill="#37474f"/><rect x="12" y="20" width="176" height="28" rx="4" fill="#78909c"/><g fill="#1e88e5" stroke="#0d47a1" stroke-width="1.5"><rect x="17" y="24" width="17" height="19" rx="3"/><rect x="38" y="24" width="17" height="19" rx="3"/><rect x="59" y="24" width="17" height="19" rx="3"/><rect x="80" y="24" width="17" height="19" rx="3"/><rect x="101" y="24" width="17" height="19" rx="3"/><rect x="122" y="24" width="17" height="19" rx="3"/><rect x="143" y="24" width="17" height="19" rx="3"/><rect x="164" y="24" width="17" height="19" rx="3"/></g>' },
     ladder: { vb:'0 0 220 44', body:'<rect x="0" y="4" width="220" height="6" rx="3" fill="#f4d03f"/><rect x="0" y="34" width="220" height="6" rx="3" fill="#f4d03f"/><rect x="0" y="4" width="6" height="36" fill="#f4d03f"/><rect x="36" y="4" width="6" height="36" fill="#f4d03f"/><rect x="72" y="4" width="6" height="36" fill="#f4d03f"/><rect x="108" y="4" width="6" height="36" fill="#f4d03f"/><rect x="144" y="4" width="6" height="36" fill="#f4d03f"/><rect x="180" y="4" width="6" height="36" fill="#f4d03f"/><rect x="214" y="4" width="6" height="36" fill="#f4d03f"/>' }
 };
 function equipSvg(type, w, h){
@@ -1398,6 +1410,7 @@ function createItemVariant(v){
     if(v === 'smallgoal'){ w = '10%'; h = '7%'; }
     if(v === 'minigoal'){ w = '8%'; h = '6%'; }
     if(v === 'ladder'){ w = '24%'; h = '6%'; }
+    if(v === 'bench'){ w = '26%'; h = '11%'; }
     return createObject('player item-obj', '', '46%', '12%', 14, true, w, h, null, null, v);
 }
 function createEquipment(type){
@@ -1405,6 +1418,7 @@ function createEquipment(type){
     if(type === 'pole') return createObject('player pole', '', '46%', '55%', 3, false);
     if(type === 'dummy') return createObject('player dummy', '', '46%', '45%', 5, false);
     if(type === 'ladder') return createItemVariant('ladder');
+    if(type === 'bench') return createItemVariant('bench');
     return createObject('player cone', '▲', '46%', '60%', 8, false);
 }
 function setupLongPress(btn, onLong){
@@ -1458,7 +1472,7 @@ document.querySelectorAll('#goal-grid .equip-btn').forEach(b => {
 function populateEquipMenus(){
     document.querySelectorAll('#equip-grid .equip-btn').forEach(b => {
         const ty = b.dataset.equip;
-        b.querySelector('.equip-ico').innerHTML = ty === 'cone' ? '▲' : ty === 'ladder' ? itemSvg('ladder', 44, 14) : equipSvg(ty, ty === 'disc' ? 40 : 16, ty === 'disc' ? 22 : 38);
+        b.querySelector('.equip-ico').innerHTML = ty === 'cone' ? '▲' : ty === 'ladder' ? itemSvg('ladder', 44, 14) : ty === 'bench' ? itemSvg('bench', 50, 14) : equipSvg(ty, ty === 'disc' ? 40 : 16, ty === 'disc' ? 22 : 38);
     });
     document.querySelectorAll('#goal-grid .equip-btn').forEach(b => {
         b.querySelector('.equip-ico').innerHTML = itemSvg(b.dataset.goal, 48, 28);
@@ -1484,8 +1498,13 @@ function setupPercentDrag(el, size) {
             const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
             let fL = sL + ((cX - sX) / field.clientWidth) * 100;
             let fT = sT + ((cY - sY) / field.clientHeight) * 100;
-            const max = 100 - size;
-            if (fL < 0) fL = 0; if (fT < 0) fT = 0; if (fL > max) fL = max; if (fT > max) fT = max;
+            /* Grenzen aus der tatsaechlichen Groesse - getrennt fuer Breite und
+               Hoehe. Vorher galt fuer beide Achsen die Breite in Prozent; weil
+               das Feld breiter als hoch ist, liefen Objekte unten ueber den Rand. */
+            const maxL = 100 - el.offsetWidth / field.clientWidth * 100;
+            const maxT = 100 - el.offsetHeight / field.clientHeight * 100;
+            if (fL > maxL) fL = maxL; if (fT > maxT) fT = maxT;
+            if (fL < 0) fL = 0; if (fT < 0) fT = 0;
             el.style.left = fL + '%'; el.style.top = fT + '%';
         }
         function endDrag() {
@@ -2556,9 +2575,8 @@ function drawFieldFrame(g, W, H, assets){
         }
         if(el.classList.contains('cone')){
             g.fillStyle = el.style.color || '#ff9f1c';
-            g.font = Math.round(h * 0.8) + 'px Arial';
-            g.textAlign = 'center'; g.textBaseline = 'middle';
-            g.fillText('▲', x + w / 2, y + h / 2 + h * 0.06);
+            g.beginPath(); g.moveTo(x + w * 0.5, y + h * 0.04); g.lineTo(x + w * 0.95, y + h * 0.94); g.lineTo(x + w * 0.05, y + h * 0.94); g.closePath();
+            g.fill(); g.lineWidth = 1; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.stroke();
             return;
         }
         if(el.classList.contains('disc') || el.classList.contains('pole') || el.classList.contains('dummy')){
@@ -2661,6 +2679,7 @@ function updateContextButtons() {
     itemBtn.title = t.goalNames[gv] || '';
     if(currentEquip === 'cone') coneBtn.innerHTML = '▲';
     else if(currentEquip === 'ladder') coneBtn.innerHTML = itemSvg('ladder', 34, 12);
+    else if(currentEquip === 'bench') coneBtn.innerHTML = itemSvg('bench', 34, 10);
     else if(currentEquip === 'disc') coneBtn.innerHTML = equipSvg('disc', 26, 15);
     else coneBtn.innerHTML = equipSvg(currentEquip, 11, 24);
     coneBtn.title = t.equipNames[currentEquip] || '';
@@ -2702,7 +2721,7 @@ const translations = {
         <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen - sie bleiben dann ausgewählt und lassen sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Abgewählt wird über ein anderes Objekt oder die Zurück-Taste. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
         <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder. Hütchen, Plättchen, Stangen und Dummys lassen sich mit ➖/➕ oder mit zwei Fingern vergrößern und verkleinern.<br><br>
         <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. Bei eingeschalteter Animation werden gemalte Striche zu Spielzügen (siehe unten). <br><br>
-        <u>Trainingsgeräte & Tore:</u> Kurzes Tippen erstellt das zuletzt gewählte Gerät bzw. Tor – gedrückt halten öffnet die Auswahl (Plättchen, Stangen, Koordinationsleiter, Freistoßdummys bzw. Groß-, Klein- und Minitor). Plättchen und Stangen lassen sich wie Hütchen einfärben, Tore am ↻-Griff drehen. <br><br>
+        <u>Trainingsgeräte & Tore:</u> Kurzes Tippen erstellt das zuletzt gewählte Gerät bzw. Tor – gedrückt halten öffnet die Auswahl (Plättchen, Stangen, Koordinationsleiter, Freistoßdummys, Auswechselbank bzw. Groß-, Klein- und Minitor). Plättchen und Stangen lassen sich wie Hütchen einfärben, Tore am ↻-Griff drehen. <br><br>
         <u>Pfeile:</u> Pfeile lassen sich direkt auf der Linie antippen und verschieben. Ausgewählte Pfeile zeigen Griffe an Start, Ende und Zwischenpunkten – ziehe sie einzeln, um jede Form zu erzeugen. Mit "＋ Punkt" fügst du Zwischenpunkte hinzu, z.B. für enge Kreise um ein Hütchen oder S-Kurven. Färben und Stricheln geht über die Farb-Felder und den Linienstil. <br><br>
         <u>Animation:</u> Tippe auf 🎬 Animation, um Schritt-Nummern und Abspiel-Steuerung einzublenden – für reine Aufstellungen bleibt das Feld so aufgeräumt. Erstelle Pfeile an Spielern (Laufweg) oder Bällen (Schuss/Pass) und weise jedem Pfeil einen Schritt zu. Pfeile mit gleicher Schrittnummer laufen gleichzeitig ab. "Mit Ball" lässt den Spieler dribbeln. Mit "Abspielen" startet die Sequenz, "Zurück" stellt die Ausgangspositionen wieder her. 🔁 wiederholt die Animation als Endlosschleife (Stopp über den ⏹-Button), pro Pfeil lässt sich das Tempo einstellen (🚶 Langsam / 🏃 Normal / 💨 Sprint) und mit 🎞️ exportierst du den Spielzug als animiertes GIF. <br><br>
         <u>Spielzüge malen:</u> Bei eingeschalteter 🎬 Animation mit ✏️ Malen einfach eine Linie ziehen: Beginnt sie auf einem Spieler, wird sie zum Laufweg (gestrichelt) – liegt der Ball am Spieler, zum Dribbling (Wellenlinie). Beginnt sie auf dem Ball, wird sie zum Pass. Die Spieler laufen die gemalte Linie flüssig ab, auch Slalom und Richtungswechsel. Jeder neue Weg bekommt automatisch den nächsten Schritt. Malst du nach einem Pass den Laufweg des Passgebers, läuft er im selben Schritt direkt nach dem Abspiel los; andere Spieler im selben Schritt starten gleichzeitig mit dem Pass. <br><br>
@@ -2765,7 +2784,7 @@ const translations = {
         msgImported: (n) => n + ' Taktik(en) importiert!',
         msgImportError: 'Import fehlgeschlagen – ungültige Datei.',
         obTitle: 'Willkommen bei TacticBoard!',
-        obText: `<strong>1. Aufstellen:</strong> 🔴 und 🔵 erstellen Spieler und Gegner. Kurzes Tippen auf das Ball-, Tor- oder Geräte-Symbol erstellt das zuletzt gewählte Objekt – <u>gedrückt halten</u> öffnet die volle Auswahl (Plättchen, Stangen, Leiter, Dummys, verschiedene Tore). <br><br>
+        obText: `<strong>1. Aufstellen:</strong> 🔴 und 🔵 erstellen Spieler und Gegner. Kurzes Tippen auf das Ball-, Tor- oder Geräte-Symbol erstellt das zuletzt gewählte Objekt – <u>gedrückt halten</u> öffnet die volle Auswahl (Plättchen, Stangen, Leiter, Dummys, Auswechselbank, verschiedene Tore). <br><br>
         <strong>2. Pfeile:</strong> Objekt antippen → "➦ Pfeil". Ziehe einfach an der Pfeilspitze. "＋ Punkt" erzeugt Kurven und Kreise. <br><br>
         <strong>3. Animation:</strong> 🎬 einschalten, den Pfeilen Schritte und Tempo zuweisen, mit ▶ abspielen – 🔁 wiederholt endlos, 🎞️ speichert den Spielzug als GIF. Mit ✏️ kannst du Wege auch frei malen: Ein Strich, der auf einem Spieler beginnt, wird zum Laufweg (mit Ball: Dribbling), ein Strich vom Ball zum Pass. Pass antippen → flach oder hoch. ⚔️ Zweikampf: Spieler wählen, dann den Gegenspieler antippen. <br><br>
         <strong>4. Sichern & Teilen:</strong> 💾 speichert die Taktik, 📤 exportiert sie als Datei für andere Geräte oder Co-Trainer.`,
@@ -2799,7 +2818,7 @@ const translations = {
         equipTitle: 'Trainingsgeräte',
         goalTitle: 'Tor wählen',
         netTitle: 'Netz wählen',
-        equipNames: { ball:'Ball', cone:'Hütchen', disc:'Plättchen', pole:'Stange', ladder:'Koordinationsleiter', dummy:'Freistoßdummy' },
+        equipNames: { ball:'Ball', cone:'Hütchen', disc:'Plättchen', pole:'Stange', ladder:'Koordinationsleiter', dummy:'Freistoßdummy', bench:'Auswechselbank' },
         goalNames: { goal:'Großtor', smallgoal:'Kleintor', minigoal:'Minitor', basket:'Korb', net:'Netz', smallnet:'Mininetz' }
     },
     en: {
@@ -2833,7 +2852,7 @@ const translations = {
         <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: tap one - it stays selected, and you can then pinch with two fingers anywhere on the field to resize and rotate it. To clear the selection, choose another object or press back. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
         <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes. Cones, flat markers, poles and dummies can be resized with ➖/➕ or with two fingers.<br><br>
         <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. With animation enabled, drawn lines become moves (see below). <br><br>
-        <u>Training equipment & goals:</u> A short tap creates the last selected item – press and hold to open the selection (flat markers, poles, agility ladder, free-kick dummies, or full/small/mini goals). Flat markers and poles can be colored like cones, goals can be rotated using the ↻ handle. <br><br>
+        <u>Training equipment & goals:</u> A short tap creates the last selected item – press and hold to open the selection (flat markers, poles, agility ladder, free-kick dummies, substitutes bench, or full/small/mini goals). Flat markers and poles can be colored like cones, goals can be rotated using the ↻ handle. <br><br>
         <u>Arrows:</u> Arrows can be tapped and dragged directly on the line. Selected arrows show handles at start, end and via points – drag them individually to create any shape. Use "＋ Point" to add via points, e.g. for tight circles around a cone or S-curves. Coloring and dashing works via the color boxes and line style. <br><br>
         <u>Animation:</u> Tap 🎬 Animation to show step numbers and playback controls – for plain lineups the field stays clean. Create arrows on players (running path) or balls (shot/pass) and assign a step to each arrow. Arrows with the same step number play simultaneously. "With ball" makes the player dribble. "Play" starts the sequence, "Reset" restores the starting positions. 🔁 repeats the animation as an endless loop (stop via the ⏹ button), each arrow has its own pace (🚶 Slow / 🏃 Normal / 💨 Sprint) and 🎞️ exports the play as an animated GIF. <br><br>
         <u>Drawing moves:</u> With 🎬 Animation enabled, simply draw a line with ✏️ Draw: if it starts on a player it becomes a run (dashed) – if the ball is at the player's feet, a dribble (wavy line). If it starts on the ball it becomes a pass. Players follow the drawn line smoothly, including slaloms and changes of direction. Each new path automatically gets the next step. If you draw the passer's run after a pass, he starts in the same step right after playing the ball; other players in that step start together with the pass. <br><br>
@@ -2896,7 +2915,7 @@ const translations = {
         msgImported: (n) => n + ' tactic(s) imported!',
         msgImportError: 'Import failed – invalid file.',
         obTitle: 'Welcome to TacticBoard!',
-        obText: `<strong>1. Set up:</strong> 🔴 and 🔵 create players and opponents. A short tap on the ball, goal or equipment icon creates the last selected object – <u>press and hold</u> opens the full selection (flat markers, poles, ladder, dummies, different goals). <br><br>
+        obText: `<strong>1. Set up:</strong> 🔴 and 🔵 create players and opponents. A short tap on the ball, goal or equipment icon creates the last selected object – <u>press and hold</u> opens the full selection (flat markers, poles, ladder, dummies, substitutes bench, different goals). <br><br>
         <strong>2. Arrows:</strong> Tap an object → "➦ Arrow". Simply drag the arrowhead. "＋ Point" creates curves and circles. <br><br>
         <strong>3. Animation:</strong> Enable 🎬, assign steps and pace to the arrows, play with ▶ – 🔁 loops endlessly, 🎞️ saves the play as a GIF. With ✏️ you can also draw paths freehand: a line starting on a player becomes a run (with the ball: a dribble), a line from the ball becomes a pass. Tap a pass → low or high. ⚔️ Duel: select a player, then tap the opponent. <br><br>
         <strong>4. Save & share:</strong> 💾 saves the tactic, 📤 exports it as a file for other devices or fellow coaches.`,
@@ -2930,7 +2949,7 @@ const translations = {
         equipTitle: 'Training equipment',
         goalTitle: 'Choose goal',
         netTitle: 'Choose net',
-        equipNames: { ball:'Ball', cone:'Cone', disc:'Flat marker', pole:'Pole', ladder:'Agility ladder', dummy:'Free-kick dummy' },
+        equipNames: { ball:'Ball', cone:'Cone', disc:'Flat marker', pole:'Pole', ladder:'Agility ladder', dummy:'Free-kick dummy', bench:'Substitutes bench' },
         goalNames: { goal:'Full goal', smallgoal:'Small goal', minigoal:'Mini goal', basket:'Basket', net:'Net', smallnet:'Mini net' }
     }
 };
