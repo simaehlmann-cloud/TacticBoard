@@ -1109,6 +1109,7 @@ function createObject(className, text, left, top, sizePercent, selectable, wPerc
     el.className = className; el.style.left = left; el.style.top = top;
     el.dataset.selectable = selectable ? '1' : '0'; el.dataset.text = text;
     el.dataset.oid = oid || ('o' + (++oidCounter) + '_' + Date.now());
+    if(animBaseline && !animBaseline[el.dataset.oid]) animBaseline[el.dataset.oid] = { left: left, top: top };
 
     if (wPercent) el.style.width = wPercent;
     if (hPercent) el.style.height = hPercent;
@@ -1860,7 +1861,18 @@ function naechsterBall(pos, von, maxD){
    Damit kann man einen Pass dort ansetzen, wo das Dribbling endet. */
 function projizierteLagen(){
     const pos = new Map();
-    field.querySelectorAll('.player').forEach(el => { if(istBeweglich(el)) pos.set(el, centerOf(el)); });
+    pos.starts = [];   // je Pfeil: Ziel, Schritt und Startpunkt - fuer "Pass und direkt loslaufen"
+    /* Nach dem Abspielen stehen die Objekte am Endpunkt. Gerechnet wird
+       trotzdem immer von der Ausgangsaufstellung aus, sonst wuerden die
+       bisherigen Schritte doppelt gezaehlt. */
+    const fw = field.clientWidth, fh = field.clientHeight;
+    field.querySelectorAll('.player').forEach(el => {
+        if(!istBeweglich(el)) return;
+        const b = animBaseline && animBaseline[el.dataset.oid];
+        if(b && isFinite(parseFloat(b.left)) && isFinite(parseFloat(b.top))){
+            pos.set(el, { x: parseFloat(b.left) / 100 * fw + el.offsetWidth / 2, y: parseFloat(b.top) / 100 * fh + el.offsetHeight / 2 });
+        } else pos.set(el, centerOf(el));
+    });
     const arrows = Array.from(field.querySelectorAll('.arrow-container'))
         .filter(a => a.dataset.kind !== 'duel')
         .sort((x, y) => (parseInt(x.dataset.step, 10) || 1) - (parseInt(y.dataset.step, 10) || 1));
@@ -1870,6 +1882,7 @@ function projizierteLagen(){
         const pts = getArrowPixelPoints(a);
         if(pts.length < 2) return;
         const s = pos.get(tgt);
+        pos.starts.push({ tgt, step: parseInt(a.dataset.step, 10) || 1, start: { x: s.x, y: s.y } });
         const end = { x: pts[pts.length - 1].x - pts[0].x + s.x, y: pts[pts.length - 1].y - pts[0].y + s.y };
         if(a.dataset.withBall === 'true' && !tgt.classList.contains('ball')){
             const b = naechsterBall(pos, s, field.clientWidth * 0.2);
@@ -1912,11 +1925,14 @@ function strichZuLaufweg(stroke){
     let tgt = null, bestQ = Infinity, tgtPos = null;
     [true, false].forEach(nurBall => {
         if(tgt) return;
-        pos.forEach((p, el) => {
+        pos.forEach((pp, el) => {
             if(el.classList.contains('ball') !== nurBall) return;
             const r = Math.max(el.offsetWidth / 2, 14) + (nurBall ? 4 : 8);
-            const q = Math.hypot(p.x - raw[0].x, p.y - raw[0].y) / r;
-            if(q < 1 && q < bestQ){ bestQ = q; tgt = el; tgtPos = p; }
+            // Endlage nach den bisherigen Schritten oder dort, wo das Objekt gerade sichtbar steht
+            [pp, centerOf(el)].forEach(p => {
+                const q = Math.hypot(p.x - raw[0].x, p.y - raw[0].y) / r;
+                if(q < 1 && q < bestQ){ bestQ = q; tgt = el; tgtPos = p; }
+            });
         });
     });
     if(!tgt) return false;
@@ -1935,7 +1951,18 @@ function strichZuLaufweg(stroke){
         +Math.min(100, Math.max(0, p.y / fh * 100)).toFixed(3)
     ]);
     const art = istBall ? 'pass' : (mitBall ? 'dribble' : 'run');
-    const step = String(naechsterSchritt());
+    let step = String(naechsterSchritt());
+    let mitPass = false;
+    /* Pass und direkt loslaufen: Hat genau dieser Spieler im letzten Schritt
+       den Ball gespielt, laeuft er im selben Schritt los - beim Abspielen
+       startet sein Lauf automatisch erst nach dem Pass (playAnimation). */
+    if(art === 'run'){
+        const letzter = parseInt(step, 10) - 1;
+        const pass = pos.starts.find(x => x.step === letzter && x.tgt.classList.contains('ball')
+            && Math.hypot(x.start.x - tgtPos.x, x.start.y - tgtPos.y) < tgt.offsetWidth * 1.3);
+        const schonDran = pos.starts.some(x => x.step === letzter && x.tgt === tgt);
+        if(pass && !schonDran){ step = String(letzter); mitPass = true; }
+    }
     const arrow = buildArrowOnField(pct, stroke.color, art === 'run', tgt.dataset.oid, step, art === 'dribble', 'normal', {});
     /* Der Verlauf enthaelt schon den Zeichen-Schnappschuss von startDraw -
        den ersetzen, damit Rueckgaengig den Weg entfernt statt einen leeren
@@ -1943,7 +1970,7 @@ function strichZuLaufweg(stroke){
     const top = actionHistory[actionHistory.length - 1];
     if(top && top.type === 'canvas') actionHistory.pop();
     actionHistory.push({ type: 'arrowAdd', el: arrow }); trimHistory();
-    showToast(translations[LANG].msgPathCreated(translations[LANG].pathKinds[art], step));
+    showToast(mitPass ? translations[LANG].msgPassAndGo(step) : translations[LANG].msgPathCreated(translations[LANG].pathKinds[art], step));
     return true;
 }
 
@@ -2193,8 +2220,12 @@ function animateDuel(arrow){
         setTimeout(() => { a.classList.remove('duel-blink'); b.classList.remove('duel-blink'); resolve(); }, dauer);
     });
 }
-function animateArrow(arrow){
+function animateArrow(arrow, verzoegerung){
     if(arrow.dataset.kind === 'duel') return animateDuel(arrow);
+    // Passgeber: laeuft erst los, wenn der Ball gespielt ist
+    if(typeof verzoegerung === 'number' && verzoegerung > 0){
+        return new Promise(r => setTimeout(r, verzoegerung)).then(() => animateArrow(arrow, 0));
+    }
     return new Promise(resolve => {
         const tgt = findByOid(arrow.dataset.targetOid);
         const pts = getArrowPixelPoints(arrow);
@@ -2331,11 +2362,14 @@ async function playAnimation(noLoop){
     isAnimating = true; stopRequested = false;
     playBtn.innerHTML = translations[LANG].stopBtn;
     selectPlayer(null);
-    if(!animBaseline){
-        animBaseline = {};
-        field.querySelectorAll('.player').forEach(p => { animBaseline[p.dataset.oid] = { left: p.style.left, top: p.style.top }; });
-        resetAnimBtn.disabled = false;
-    }
+    /* Ausgangsaufstellung merken. Objekte, die erst nach dem letzten
+       Abspielen dazugekommen sind (z.B. ein neuer Ball), fehlten bisher in
+       dieser Liste - "Zurueck" liess sie dann am Endpunkt stehen. */
+    if(!animBaseline) animBaseline = {};
+    field.querySelectorAll('.player').forEach(p => {
+        if(!animBaseline[p.dataset.oid]) animBaseline[p.dataset.oid] = { left: p.style.left, top: p.style.top };
+    });
+    resetAnimBtn.disabled = false;
     field.classList.add('anim-playing');
     const groups = {};
     arrows.forEach(a => { const s = parseInt(a.dataset.step || '1', 10); (groups[s] = groups[s] || []).push(a); });
@@ -2348,7 +2382,21 @@ async function playAnimation(noLoop){
             for(const k of keys){
                 if(stopRequested) break;
                 groups[k].forEach(a => a.classList.add('anim-current'));
-                await Promise.all(groups[k].map(animateArrow));
+                /* Wer im selben Schritt den Ball passt und laeuft, startet seinen
+                   Lauf erst nach dem Abspiel. Alle anderen laufen mit dem Pass los.
+                   Passgeber = Spieler, an dessen Fuss der gespielte Ball liegt. */
+                const baelle = groups[k].map(a => findByOid(a.dataset.targetOid))
+                    .filter(t => t && t.classList.contains('ball')).map(centerOf);
+                const abspielZeit = 380 / ((parseInt(animSpeedSlider.value, 10) || 100) / 100);
+                const verzoegerung = a => {
+                    if(a.dataset.kind === 'duel' || a.dataset.withBall === 'true') return 0;
+                    const t = findByOid(a.dataset.targetOid);
+                    if(!t || t.classList.contains('ball')) return 0;
+                    const c = centerOf(t);
+                    return baelle.some(b => Math.hypot(b.x - c.x, b.y - c.y) < t.offsetWidth * 1.3) ? abspielZeit : 0;
+                };
+                const plan = groups[k].map(a => [a, verzoegerung(a)]);
+                await Promise.all(plan.map(([a, v]) => animateArrow(a, v)));
                 groups[k].forEach(a => a.classList.remove('anim-current'));
                 await new Promise(r => setTimeout(r, 250)); // kurze Pause zwischen den Schritten
             }
@@ -2708,6 +2756,7 @@ const translations = {
         footNames: { auto:'🦶 Fuß: auto', right:'🦶 Fuß: rechts', left:'🦶 Fuß: links' },
         pathKinds: { run:'Laufweg', dribble:'Dribbling', pass:'Pass' },
         msgPathCreated: (art, s) => art + ' als Schritt ' + s + ' angelegt',
+        msgPassAndGo: s => 'Laufweg startet direkt nach dem Pass (Schritt ' + s + ')',
         msgGifCreating: 'GIF wird aufgenommen…',
         msgGifDone: 'GIF gespeichert!',
         msgGifUnavailable: 'GIF-Export nicht verfügbar (Internetverbindung erforderlich).',
@@ -2823,6 +2872,7 @@ const translations = {
         footNames: { auto:'🦶 Foot: auto', right:'🦶 Foot: right', left:'🦶 Foot: left' },
         pathKinds: { run:'Run', dribble:'Dribble', pass:'Pass' },
         msgPathCreated: (art, s) => art + ' added as step ' + s,
+        msgPassAndGo: s => 'Run starts right after the pass (step ' + s + ')',
         playBtn: '▶ Play',
         resetAnimBtn: '⏮ Reset',
         animSpeed: 'Overall speed:',
