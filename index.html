@@ -484,7 +484,10 @@ body.landscape-fit footer {
         <div class="row">
             <button id="export-tactics-btn">📤 Export</button>
             <button id="import-tactics-btn">📥 Import</button>
-            <input id="import-file-input" type="file" accept=".json,application/json" style="display:none;" />
+            <!-- Bewusst ohne accept-Filter: Android (v.a. Samsung) meldet .json-Dateien oft
+                 als "application/octet-stream" und graut sie im Dateiwaehler aus. Geprueft
+                 wird stattdessen der Inhalt beim Einlesen. -->
+            <input id="import-file-input" type="file" style="display:none;" />
         </div>
     </div>
 </div>
@@ -3740,7 +3743,7 @@ exportTacticsBtn.addEventListener('click', () => {
    Der JSON-Import ist die einzige Stelle, an der fremde Daten in die App
    kommen. Alles wird auf bekannte Werte zurechtgestutzt; was nicht passt,
    faellt weg, statt als kaputtes Objekt auf dem Feld zu landen. */
-const ALLOWED_CLASSES = ['player','enemy','ball','handball','puck','cone','item-obj','disc','pole','dummy','ladder'];
+const ALLOWED_CLASSES = ['player','enemy','ball','handball','puck','cone','item-obj','disc','pole','dummy','ladder','bench'];
 const ALLOWED_SPORTS  = ['football','basketball','handball','volleyball','icehockey'];
 const ALLOWED_PACE    = ['slow','normal','fast'];
 
@@ -3860,11 +3863,14 @@ importFileInput.addEventListener('change', () => {
     const reader = new FileReader();
     reader.onload = () => {
         try {
-            const data = JSON.parse(reader.result);
+            // Byte-Order-Mark und Leerraum am Anfang entfernen (kommt vor, wenn die
+            // Datei unterwegs durch Mail- oder Messenger-Apps gelaufen ist)
+            const text = String(reader.result || '').replace(/^\uFEFF/, '').trim();
+            const data = JSON.parse(text);
             let incoming = Array.isArray(data) ? data : (data.tactics || (data.players ? [data] : []));
             // Fremde Dateien werden nicht ungeprueft uebernommen: nur bekannte
             // Klassen, Zahlen in gueltigen Bereichen, Rest wird verworfen
-            incoming = incoming.map(sanitizeTactic).filter(Boolean);
+            incoming = incoming.map(t => sanitizeTactic(t)).filter(Boolean);
             if(incoming.length === 0) throw new Error('keine Taktiken');
             const list = getTactics();
             incoming.forEach((t, i) => { t.id = (Date.now() + i).toString(); list.push(t); });
