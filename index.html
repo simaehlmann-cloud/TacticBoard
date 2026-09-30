@@ -505,8 +505,8 @@ body.landscape-fit footer {
         <strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
         <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen - sie bleiben dann ausgewählt und lassen sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Abgewählt wird über ein anderes Objekt oder die Zurück-Taste. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
-        <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
-        <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
+        <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder. Hütchen, Plättchen, Stangen und Dummys lassen sich mit ➖/➕ oder mit zwei Fingern vergrößern und verkleinern.<br><br>
+        <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. Bei eingeschalteter Animation werden gemalte Striche zu Spielzügen (siehe unten). <br><br>
         Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
         Entwickelt von <strong>Simon Mählmann</strong>.
     </div>
@@ -1213,8 +1213,8 @@ function setupFieldPinch(){
 
     field.addEventListener('touchstart', ev => {
         if(ev.touches.length !== 2 || isDrawingMode || isAnimating) return;
-        // Nur wenn gerade ein Tor, Netz oder Korb ausgewaehlt ist. Spieler und
-        // Huetchen haben feste Groessen, dort soll die Geste nichts tun.
+        // Nur wenn gerade ein Tor, Netz, Korb oder ein Huetchen/Geraet ausgewaehlt
+        // ist. Spieler haben feste Groessen, dort soll die Geste nichts tun.
         const el = activePlayer;
         if(!el || !(el.classList.contains('item-obj') || equipType(el))) return;
         if(ev.cancelable) ev.preventDefault();
@@ -2090,7 +2090,8 @@ function updateButtonVisibility(){
 function feldTippAbwahl(e){
     if(isDrawingMode) return;
     if(e.target !== field && !e.target.classList.contains('field-svg-overlay')) return;
-    if(activePlayer && activePlayer.classList.contains('item-obj')) return;
+    // Tore & Co. sowie Huetchen/Geraete bleiben gewaehlt: der erste Finger der Zwei-Finger-Geste darf die Auswahl nicht aufheben
+    if(activePlayer && (activePlayer.classList.contains('item-obj') || equipType(activePlayer))) return;
     selectPlayer(null);
 }
 field.addEventListener('touchstart', feldTippAbwahl);
@@ -2667,11 +2668,14 @@ const translations = {
         aboutText: `<strong>TacticBoard</strong> ist ein digitales Taktikbrett für Trainer und Spieler. <br><br>
         Setze Spieler, Gegner, Bälle, Tore und Hütchen auf dynamische Spielfelder (Fußball, Basketball, Handball, Volleyball, Eishockey) und zeichne Laufwege und Pfeile ein. <br><br>
         <u>Objekte bewegen:</u> Antippen und ziehen. Ein Doppeltipp auf einen Spieler wechselt zwischen Spieler/Gegner. Ausgewählte Tore, Körbe und Netze bekommen einen gelben Rahmen mit zwei Griffen: einmal antippen - sie bleiben dann ausgewählt und lassen sich mit zwei Fingern irgendwo auf dem Feld aufziehen und drehen. Abgewählt wird über ein anderes Objekt oder die Zurück-Taste. Alternativ ändert der grüne Griff unten rechts die Größe, der blaue oben links dreht, und in der Werkzeugleiste erscheinen Knöpfe dafür. <br><br>
-        <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder.<br><br>
-        <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. <br><br>
+        <u>Hütchen und Pfeile färben:</u> Wähle ein Hütchen oder einen Pfeil an (leuchtet gelb) und klicke auf eines der Farb-Felder. Hütchen, Plättchen, Stangen und Dummys lassen sich mit ➖/➕ oder mit zwei Fingern vergrößern und verkleinern.<br><br>
+        <u>Malen-Modus:</u> Solange "Malen" aktiv ist, kannst du zeichnen, aber keine Objekte bewegen oder erstellen. Tippe auf "Fertig", um den Modus zu verlassen. Bei eingeschalteter Animation werden gemalte Striche zu Spielzügen (siehe unten). <br><br>
         <u>Trainingsgeräte & Tore:</u> Kurzes Tippen erstellt das zuletzt gewählte Gerät bzw. Tor – gedrückt halten öffnet die Auswahl (Plättchen, Stangen, Koordinationsleiter, Freistoßdummys bzw. Groß-, Klein- und Minitor). Plättchen und Stangen lassen sich wie Hütchen einfärben, Tore am ↻-Griff drehen. <br><br>
         <u>Pfeile:</u> Pfeile lassen sich direkt auf der Linie antippen und verschieben. Ausgewählte Pfeile zeigen Griffe an Start, Ende und Zwischenpunkten – ziehe sie einzeln, um jede Form zu erzeugen. Mit "＋ Punkt" fügst du Zwischenpunkte hinzu, z.B. für enge Kreise um ein Hütchen oder S-Kurven. Färben und Stricheln geht über die Farb-Felder und den Linienstil. <br><br>
         <u>Animation:</u> Tippe auf 🎬 Animation, um Schritt-Nummern und Abspiel-Steuerung einzublenden – für reine Aufstellungen bleibt das Feld so aufgeräumt. Erstelle Pfeile an Spielern (Laufweg) oder Bällen (Schuss/Pass) und weise jedem Pfeil einen Schritt zu. Pfeile mit gleicher Schrittnummer laufen gleichzeitig ab. "Mit Ball" lässt den Spieler dribbeln. Mit "Abspielen" startet die Sequenz, "Zurück" stellt die Ausgangspositionen wieder her. 🔁 wiederholt die Animation als Endlosschleife (Stopp über den ⏹-Button), pro Pfeil lässt sich das Tempo einstellen (🚶 Langsam / 🏃 Normal / 💨 Sprint) und mit 🎞️ exportierst du den Spielzug als animiertes GIF. <br><br>
+        <u>Spielzüge malen:</u> Bei eingeschalteter 🎬 Animation mit ✏️ Malen einfach eine Linie ziehen: Beginnt sie auf einem Spieler, wird sie zum Laufweg (gestrichelt) – liegt der Ball am Spieler, zum Dribbling (Wellenlinie). Beginnt sie auf dem Ball, wird sie zum Pass. Die Spieler laufen die gemalte Linie flüssig ab, auch Slalom und Richtungswechsel. Jeder neue Weg bekommt automatisch den nächsten Schritt. Malst du nach einem Pass den Laufweg des Passgebers, läuft er im selben Schritt direkt nach dem Abspiel los; andere Spieler im selben Schritt starten gleichzeitig mit dem Pass. <br><br>
+        <u>Pass und Dribbling einstellen:</u> Pass antippen → "〰️ Flach" oder "⤴️ Hoch". Ein hoher Ball wird gepunktet dargestellt und steigt in der Animation mit Schatten auf. Beim Dribbling legt "🦶 Fuß" den ballführenden Fuß fest: "auto" wechselt vor jeder Kurve auf den äußeren Fuß, "rechts" oder "links" bleiben fest. <br><br>
+        <u>Zweikampf:</u> Spieler auswählen, "⚔️ Zweikampf" tippen, dann den Gegenspieler antippen. Beide werden mit einer roten Zickzack-Linie verbunden und blinken in ihrem Schritt der Animation. <br><br>
         Deine Taktiken lassen sich mitsamt Animation speichern, als Datei exportieren und auf anderen Geräten importieren – oder als Bild bzw. GIF teilen. <br><br>
         Entwickelt von <strong>Simon Mählmann</strong>.`,
         closeBtn: 'Schließen',
@@ -2795,11 +2799,14 @@ const translations = {
         aboutText: `<strong>TacticBoard</strong> is a digital tactics board for coaches and players. <br><br>
         Place players, opponents, balls, goals and cones on dynamic fields (football, basketball, handball, volleyball, ice hockey) and draw movement paths and arrows. <br><br>
         <u>Moving objects:</u> Tap and drag. Double-tapping a player toggles between player/opponent. Selected goals, baskets and nets show a yellow frame with two handles: tap one - it stays selected, and you can then pinch with two fingers anywhere on the field to resize and rotate it. To clear the selection, choose another object or press back. Alternatively the green handle at the bottom right resizes, the blue one at the top left rotates, and buttons appear in the toolbar. <br><br>
-        <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes.<br><br>
-        <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. <br><br>
+        <u>Coloring cones and arrows:</u> Select a cone or an arrow (glows yellow) and click one of the color boxes. Cones, flat markers, poles and dummies can be resized with ➖/➕ or with two fingers.<br><br>
+        <u>Draw mode:</u> While "Draw" is active, you can draw freely, but you can't move or create new objects. Tap "Done" to leave the mode. With animation enabled, drawn lines become moves (see below). <br><br>
         <u>Training equipment & goals:</u> A short tap creates the last selected item – press and hold to open the selection (flat markers, poles, agility ladder, free-kick dummies, or full/small/mini goals). Flat markers and poles can be colored like cones, goals can be rotated using the ↻ handle. <br><br>
         <u>Arrows:</u> Arrows can be tapped and dragged directly on the line. Selected arrows show handles at start, end and via points – drag them individually to create any shape. Use "＋ Point" to add via points, e.g. for tight circles around a cone or S-curves. Coloring and dashing works via the color boxes and line style. <br><br>
         <u>Animation:</u> Tap 🎬 Animation to show step numbers and playback controls – for plain lineups the field stays clean. Create arrows on players (running path) or balls (shot/pass) and assign a step to each arrow. Arrows with the same step number play simultaneously. "With ball" makes the player dribble. "Play" starts the sequence, "Reset" restores the starting positions. 🔁 repeats the animation as an endless loop (stop via the ⏹ button), each arrow has its own pace (🚶 Slow / 🏃 Normal / 💨 Sprint) and 🎞️ exports the play as an animated GIF. <br><br>
+        <u>Drawing moves:</u> With 🎬 Animation enabled, simply draw a line with ✏️ Draw: if it starts on a player it becomes a run (dashed) – if the ball is at the player's feet, a dribble (wavy line). If it starts on the ball it becomes a pass. Players follow the drawn line smoothly, including slaloms and changes of direction. Each new path automatically gets the next step. If you draw the passer's run after a pass, he starts in the same step right after playing the ball; other players in that step start together with the pass. <br><br>
+        <u>Pass and dribble options:</u> Tap a pass → "〰️ Low" or "⤴️ High". A high ball is shown dotted and rises with a shadow during the animation. For a dribble, "🦶 Foot" sets the ball-carrying foot: "auto" switches to the outside foot before each turn, "right" or "left" stay fixed. <br><br>
+        <u>Duel:</u> Select a player, tap "⚔️ Duel", then tap the opponent. Both are linked by a red zigzag line and flash during their animation step. <br><br>
         Your tactics can be saved including the animation, exported as a file and imported on other devices – or shared as an image or GIF. <br><br>
         Developed by <strong>Simon Mählmann</strong>.`,
         closeBtn: 'Close',
