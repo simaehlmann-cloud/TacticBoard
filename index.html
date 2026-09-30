@@ -2281,7 +2281,8 @@ function animateArrow(arrow, verzoegerung){
         // Pixel pro Sekunde: Schuss deutlich schneller, hoher Ball etwas langsamer (Flugzeit), Tempo pro Pfeil
         const speed = (isShot ? (isHigh ? 320 : 450) : 170) * mult * paceMult;
         const duration = Math.max(isHigh ? 500 : 250, total / speed * 1000);
-        const ease = isHigh ? (t => t) : (isShot ? easeOutCubic : easeInOutQuad);
+        // Nach dem Pass startet der Laeufer sofort mit Tempo statt langsam anzulaufen
+        const ease = isHigh ? (t => t) : (isShot ? easeOutCubic : (arrow.dataset.afterPass === 'true' ? (t => 1 - (1 - t) * (1 - t)) : easeInOutQuad));
         function pointAt(frac){
             const target = frac * total;
             let i = 1;
@@ -2417,7 +2418,8 @@ async function playAnimation(noLoop){
                    Passgeber = Spieler, an dessen Fuss der gespielte Ball liegt. */
                 const baelle = groups[k].map(a => findByOid(a.dataset.targetOid))
                     .filter(t => t && t.classList.contains('ball')).map(centerOf);
-                const abspielZeit = 380 / ((parseInt(animSpeedSlider.value, 10) || 100) / 100);
+                // Nur der Moment des Abspiels - ein kurzer Pass dauert selbst kaum laenger als 0,3 s
+                const abspielZeit = 110 / ((parseInt(animSpeedSlider.value, 10) || 100) / 100);
                 const verzoegerung = a => {
                     if(a.dataset.kind === 'duel' || a.dataset.withBall === 'true') return 0;
                     if(a.dataset.afterPass === 'true') return baelle.length ? abspielZeit : 0;
