@@ -160,6 +160,57 @@ button:disabled { opacity:0.35; cursor:not-allowed; filter:none; }
 #color1-btn {background:var(--draw-color-1);} #color2-btn {background:var(--draw-color-2);}
 #clear-drawings-btn {background:#d68c45;display:none;} #add-arrow-btn {background:#f4a261;display:none;} #delete-btn {background:#b70909;display:none;}
 #import-squad-btn { background-color: #6a4c93; }
+/* KADER */
+#name-input { min-width:80px; }
+#squad-btn { background:#2a6f97; padding:10px 11px; }
+#swap-btn { background:#555; }
+#swap-btn.active-toggle { background:#ffb703; color:#000; }
+#squad-modal .modal-content { max-width:460px; text-align:left; }
+#squad-modal .modal-title { text-align:center; }
+.sq-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.sq-row select, .sq-row input[type="text"] { flex:1; min-width:0; }
+.sq-row button { padding:9px 12px; }
+#sq-add-nr { flex:0 0 58px; width:58px; }
+#sq-new-btn, #sq-add-btn { background:#2a9d8f; }
+#sq-rename-btn, #sq-all-btn, #sq-none-btn { background:#457b9d; }
+#sq-delete-btn { background:#555; }
+#sq-name-ok { background:#4caf50; }
+#sq-name-cancel { background:#555; }
+#sq-apply-btn { background:#4caf50; flex:1; justify-content:center; white-space:nowrap; }
+#sq-enemy-btn { background:#1d3557; border:1px solid #fff; }
+#sq-export-btn, #sq-import-btn { background:#457b9d; }
+#sq-close-btn { background:#555; width:100%; justify-content:center; }
+.sq-section { font-size:13px; color:#8fd694; font-weight:700; margin:14px 0 6px; text-transform:uppercase; letter-spacing:0.5px; }
+.sq-hint { font-size:12px; color:#9fb3c8; line-height:1.45; margin:0 0 8px; }
+.sq-label { font-size:13px; color:#cfd8e3; min-width:78px; }
+#sq-list { display:flex; flex-direction:column; gap:6px; margin:4px 0 8px; }
+.sq-player { background:#16324f; border-radius:8px; padding:4px 8px; border:1px solid rgba(255,255,255,0.08); }
+.sq-player.open { border-color:#4caf50; }
+.sq-line { display:flex; align-items:center; gap:8px; min-height:38px; }
+.sq-line input[type="checkbox"] { width:22px; height:22px; flex:none; margin:0; accent-color:#4caf50; cursor:pointer; }
+.sq-nr { min-width:22px; color:#9fb3c8; font-weight:700; text-align:right; font-size:13px; }
+.sq-name { flex:1; min-width:0; cursor:pointer; padding:8px 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+.sq-tag { flex:none; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; background:#457b9d; }
+.sq-tag.cap { background:#ffd60a; color:#000; }
+.sq-roles { display:flex; flex-wrap:wrap; gap:6px; padding:4px 0 8px; }
+.sq-roles button { padding:8px 10px; font-size:12px; background:#264673; }
+.sq-roles button.on { background:#4caf50; }
+.sq-roles button.cap-on { background:#ffd60a; color:#000; }
+.sq-roles .sq-del { background:#b70909; }
+.sq-check { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.sq-check input { width:20px; height:20px; margin:0; accent-color:#4caf50; }
+/* Kapitaensbinde: kleines K am Spielerkreis. Als Pseudo-Element, damit es
+   nicht im innerText landet - Beschriftung, Schriftgroesse und GIF-Export
+   lesen den Text des Kreises. */
+.player.captain { overflow:visible; }
+.player.captain::after {
+    content:'K'; position:absolute; right:-12%; top:-12%; width:44%; height:44%;
+    border-radius:50%; background:#ffd60a; color:#000; border:1px solid rgba(0,0,0,0.6);
+    display:flex; align-items:center; justify-content:center; box-sizing:border-box;
+    font-size:calc(var(--ball-font, 14px) * 0.4); font-weight:800; line-height:1; letter-spacing:0;
+    pointer-events:none;
+}
+html[lang="en"] .player.captain::after { content:'C'; }
 #import-text { width:100%; box-sizing:border-box; border-radius:8px; border:none; padding:10px; font-size:13px; font-family:monospace; resize:vertical; }
 #import-preview { text-align:left; margin:12px 0; display:flex; flex-direction:column; gap:8px; }
 .import-block { background:#16324f; border:2px solid transparent; border-radius:8px; padding:10px; cursor:pointer; font-size:13px; line-height:1.45; }
@@ -298,6 +349,7 @@ footer button { background:transparent; border:1px solid rgba(255,255,255,0.3); 
 
 /* MODALS */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); display:none; align-items:center; justify-content:center; z-index:2000; backdrop-filter: blur(3px); touch-action: manipulation;}
+#custom-confirm { z-index:2100; }
 .modal-content { background:#1d3557; padding:24px; border-radius:12px; max-width:400px; width: 90%; max-height:80vh; overflow-y:auto; text-align:center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); box-sizing:border-box; border: 1px solid rgba(255,255,255,0.1); }
 .modal-title { font-weight:bold; font-size:22px; margin-bottom:15px; color: #4caf50;}
 .modal-text { font-size: 14px; line-height: 1.6; margin-bottom: 20px; text-align: left;}
@@ -404,6 +456,7 @@ body.landscape-fit footer {
         <input id="name-input" class="grow" type="text" placeholder="Nr/Name" maxlength="14" />
         <button id="action-btn" title="Spieler">🔴</button>
         <button id="enemy-btn" title="Gegner">🔵</button>
+        <button id="squad-btn">👥 Kader</button>
     </div>
 
     <div id="zoom-wrapper">
@@ -421,6 +474,7 @@ body.landscape-fit footer {
             <button id="cone-btn" title="Hütchen">▲</button>
             <button id="add-arrow-btn">➦ Pfeil</button>
             <button id="duel-btn" style="display:none;">⚔️ Zweikampf</button>
+            <button id="swap-btn" style="display:none;">⇄ Tauschen</button>
             <button id="delete-btn">🗑️ Objekt löschen</button>
             <button id="undo-draw-btn">↩️ Rückgängig</button>
         </div>
@@ -479,10 +533,6 @@ body.landscape-fit footer {
         </div>
 
         <div class="row">
-            <button id="import-squad-btn">📋 Kader einfügen</button>
-        </div>
-
-        <div class="row">
             <input id="tactic-name-input" class="grow" type="text" placeholder="Taktikname..." maxlength="40" />
             <select id="tactic-select" class="grow"></select>
         </div>
@@ -533,7 +583,7 @@ body.landscape-fit footer {
         Deine Taktiken lassen sich speichern oder als Bild exportieren. <br><br>
         Entwickelt von <strong>Simon Mählmann</strong>.
     </div>
-    <div id="app-version" style="font-size:12px; color:#9fb3c8; margin-bottom:14px;">Version 2.3.1</div>
+    <div id="app-version" style="font-size:12px; color:#9fb3c8; margin-bottom:14px;">Version 2.4.0</div>
     <button id="show-privacy-btn" style="background:#3d6b8a; width: 100%; justify-content:center; margin-bottom:8px;">Datenschutzerklärung</button>
     <button id="show-imprint-btn" style="background:#3d6b8a; width: 100%; justify-content:center; margin-bottom:8px;">Impressum</button>
     <button id="show-onboarding-btn" style="background:#457b9d; width: 100%; justify-content:center; margin-bottom:8px;">Kurzanleitung</button>
@@ -592,7 +642,7 @@ body.landscape-fit footer {
   <div class="modal-content">
     <div class="modal-title" id="import-title">Kader einfügen</div>
     <div class="modal-text" id="import-hint">Teile den Spieltag im Kaderplaner und füge den Text hier ein.</div>
-    <textarea id="import-text" rows="6" placeholder="*SV Weyhe U11 II · Fr., 21.08.2026*&#10;..."></textarea>
+    <textarea id="import-text" rows="6"></textarea>
     <div class="row" style="margin-top:10px;">
       <button id="import-paste-btn" style="background:#457b9d;">📋 Einfügen</button>
       <button id="import-parse-btn" style="background:#2a9d8f;">🔍 Prüfen</button>
@@ -600,8 +650,69 @@ body.landscape-fit footer {
     <div id="import-preview"></div>
     <div class="row">
       <button id="import-apply-btn" style="background:#4caf50; flex:1; justify-content:center;" disabled>✅ Aufs Feld</button>
+      <button id="import-save-btn" style="background:#2a6f97; flex:1; justify-content:center;" disabled>💾 Als Kader speichern</button>
       <button id="import-close-btn" style="background:#555;">Schließen</button>
     </div>
+  </div>
+</div>
+
+<div id="squad-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-title" id="sq-title">Kader</div>
+    <div class="sq-row">
+      <select id="sq-select"></select>
+      <button id="sq-new-btn">＋ Neu</button>
+      <button id="sq-rename-btn" title="Umbenennen">✏️</button>
+      <button id="sq-delete-btn" title="Löschen">🗑️</button>
+    </div>
+    <div class="sq-row">
+      <button id="import-squad-btn" style="flex:1; justify-content:center;">📋 Kader einfügen</button>
+    </div>
+    <div class="sq-row" id="sq-name-row" style="display:none;">
+      <input id="sq-name-input" type="text" maxlength="40" placeholder="" />
+      <button id="sq-name-ok">✔ OK</button>
+      <button id="sq-name-cancel">✕</button>
+    </div>
+    <div class="sq-hint" id="sq-empty-hint"></div>
+    <div id="sq-body">
+      <div class="sq-section" id="sq-sec-players">Spieler</div>
+      <div class="sq-row">
+        <input id="sq-add-name" type="text" maxlength="30" placeholder="Spielername" enterkeyhint="done" />
+        <input id="sq-add-nr" type="text" maxlength="3" inputmode="numeric" placeholder="Nr." />
+        <button id="sq-add-btn" title="Spieler hinzufügen">＋</button>
+      </div>
+      <div class="sq-hint" id="sq-tap-hint"></div>
+      <div id="sq-list"></div>
+      <div class="sq-row">
+        <button id="sq-all-btn">Alle</button>
+        <button id="sq-none-btn">Keine</button>
+        <span class="sq-hint" id="sq-count" style="margin:0;"></span>
+      </div>
+    </div>
+    <div class="sq-section" id="sq-sec-lineup">Aufstellung</div>
+    <div class="sq-row">
+      <span class="sq-label" id="sq-form-label">Spielform</span>
+      <select id="sq-form"></select>
+    </div>
+    <div class="sq-row" id="sq-formation-row">
+      <span class="sq-label" id="sq-formation-label">Formation</span>
+      <select id="sq-formation"></select>
+    </div>
+    <div class="sq-hint" id="sq-sport-hint" style="display:none;"></div>
+    <div class="sq-row">
+      <label class="sq-check"><input type="checkbox" id="sq-show-nr" /><span id="sq-show-nr-text">Trikotnummer statt Name</span></label>
+    </div>
+    <div class="sq-row">
+      <button id="sq-apply-btn">✅ Aufs Feld</button>
+      <button id="sq-enemy-btn">🔵 Gegner</button>
+    </div>
+    <div class="sq-section" id="sq-sec-file">Sichern &amp; Teilen</div>
+    <div class="sq-row">
+      <button id="sq-export-btn">📤 Export</button>
+      <button id="sq-import-btn">📥 Import</button>
+      <input id="sq-import-input" type="file" style="display:none;" />
+    </div>
+    <button id="sq-close-btn">Schließen</button>
   </div>
 </div>
 
@@ -667,6 +778,8 @@ const addPointBtn = document.getElementById('add-point-btn');
 const removePointBtn = document.getElementById('remove-point-btn');
 const paceBtn = document.getElementById('pace-btn');
 const duelBtn = document.getElementById('duel-btn');
+const swapBtn = document.getElementById('swap-btn');
+let swapSource = null;   // Spieler, der auf seinen Tauschpartner wartet
 const flightBtn = document.getElementById('flight-btn');
 const footBtn = document.getElementById('foot-btn');
 let duelSource = null;
@@ -682,7 +795,7 @@ const zoomLabelEl = document.getElementById('zoomLabel');
 const devCreditsEl = document.getElementById('dev-credits-text');
 const aboutTextEl = document.getElementById('about-text');
 /* Versionsnummer - muss mit config.xml uebereinstimmen */
-const APP_VERSION = '2.3.1';
+const APP_VERSION = '2.4.0';
 const appVersionEl = document.getElementById('app-version');
 if(appVersionEl) appVersionEl.textContent = 'Version ' + APP_VERSION;
 const flagDe = document.getElementById('flag-de');
@@ -914,7 +1027,9 @@ function pushDeleteHistory(el){
     } else {
         const isMovableObj = !el.className.includes('cone') && !el.className.includes('disc') && !el.className.includes('pole') && !el.className.includes('dummy');
         actionHistory.push({ type:'player', data:{
-            className: el.className, text: el.dataset.text || el.innerText,
+            // ohne Auswahl- und Animationsmarken - sonst leuchtet das
+            // wiederhergestellte Objekt gelb, ohne ausgewaehlt zu sein
+            className: el.className.split(/\s+/).filter(c => c && c !== 'active' && c !== 'duel-blink' && c !== 'in-flight').join(' '), text: el.dataset.text || el.innerText,
             left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height,
             color: el.dataset.color || el.style.color,
             movable: isMovableObj, oid: el.dataset.oid,
@@ -1882,6 +1997,24 @@ function duelAbbrechen(){
     duelSource = null;
     duelBtn.classList.remove('active-toggle');
 }
+/* Zwei Spieler tauschen die Plaetze, z. B. fuer einen Wechsel von der Bank.
+   Nach dem Abspielen stehen die Spieler auf Endpositionen; dann wird auch
+   die gespeicherte Ausgangsaufstellung getauscht, sonst kaeme der Tausch
+   beim Zuruecksetzen und Speichern nicht an. */
+function swapAbbrechen(){
+    swapSource = null;
+    swapBtn.classList.remove('active-toggle');
+}
+function spielerTauschen(a, b){
+    const l = a.style.left, t = a.style.top;
+    a.style.left = b.style.left; a.style.top = b.style.top;
+    b.style.left = l; b.style.top = t;
+    if(animBaseline){
+        const ba = animBaseline[a.dataset.oid], bb = animBaseline[b.dataset.oid];
+        if(ba && bb){ animBaseline[a.dataset.oid] = bb; animBaseline[b.dataset.oid] = ba; }
+    }
+    showToast(translations[LANG].msgSwapped);
+}
 
 /* ---------- Gemalter Strich -> Laufweg ---------- */
 function istBeweglich(el){
@@ -2096,6 +2229,11 @@ function selectPlayer(p){
         duelAbbrechen();
         if(p && p !== src && isDuelable(p) && src.isConnected){ zweikampfAnlegen(src, p); return; }
     }
+    if(swapSource){
+        const src = swapSource;
+        swapAbbrechen();
+        if(p && p !== src && isDuelable(p) && src.isConnected) spielerTauschen(src, p);
+    }
     if(activePlayer) activePlayer.classList.remove('active');
     if(activeArrow) activeArrow.classList.remove('active');
     activeArrow = null; activePlayer = p;
@@ -2103,6 +2241,7 @@ function selectPlayer(p){
 }
 function selectArrow(a){
     if(duelSource) duelAbbrechen();
+    if(swapSource) swapAbbrechen();
     if(activePlayer) activePlayer.classList.remove('active');
     if(activeArrow) activeArrow.classList.remove('active');
     activePlayer = null; activeArrow = a;
@@ -2116,6 +2255,7 @@ function updateButtonVisibility(){
     // Huetchen & Co. werden nur groesser/kleiner, nicht gedreht
     ['item-rot-left', 'item-rot-right', 'item-rot-snap'].forEach(id => { document.getElementById(id).style.display = istGeraet ? 'none' : ''; });
     duelBtn.style.display = (!isDrawingMode && isDuelable(activePlayer)) ? 'inline-flex' : 'none';
+    swapBtn.style.display = (!isDrawingMode && isDuelable(activePlayer)) ? 'inline-flex' : 'none';
     clearDrawingsBtn.style.display = isDrawingMode ? 'inline-flex' : 'none';
     if(isDrawingMode){ addArrowBtn.style.display = 'none'; deleteBtn.style.display = 'none'; }
     else { addArrowBtn.style.display = realP ? 'inline-flex' : 'none'; deleteBtn.style.display = (activePlayer || activeArrow) ? 'inline-flex' : 'none'; }
@@ -2202,6 +2342,7 @@ footBtn.addEventListener('click', () => {
 duelBtn.addEventListener('click', () => {
     if(!isDuelable(activePlayer)) return;
     if(duelSource){ duelAbbrechen(); return; }
+    if(swapSource) swapAbbrechen();
     duelSource = activePlayer;
     duelBtn.classList.add('active-toggle');
     showToast(translations[LANG].msgDuelPick);
@@ -2623,6 +2764,16 @@ function drawFieldFrame(g, W, H, assets){
             g.textAlign = 'center'; g.textBaseline = 'middle';
             g.fillText(txt, x + w / 2, y + h / 2 + 1);
         }
+        if(el.classList.contains('captain')){
+            const r = Math.min(w, h) * 0.22, bx = x + w * 0.9, by = y + h * 0.1;
+            g.beginPath(); g.arc(bx, by, r, 0, Math.PI * 2);
+            g.fillStyle = '#ffd60a'; g.fill();
+            g.lineWidth = 1; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.stroke();
+            g.fillStyle = '#000';
+            g.font = '800 ' + Math.max(6, r * 1.3).toFixed(1) + 'px Arial';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.fillText(translations[LANG].sqCapShort, bx, by + 0.5);
+        }
     });
 }
 exportGifBtn.addEventListener('click', async () => {
@@ -2749,6 +2900,8 @@ const translations = {
         <u>Spielzüge malen:</u> Bei eingeschalteter 🎬 Animation mit ✏️ Malen einfach eine Linie ziehen: Beginnt sie auf einem Spieler, wird sie zum Laufweg (gestrichelt) – liegt der Ball am Spieler, zum Dribbling (Wellenlinie). Beginnt sie auf dem Ball, wird sie zum Pass. Die Spieler laufen die gemalte Linie flüssig ab, auch Slalom und Richtungswechsel. Jeder neue Weg bekommt automatisch den nächsten Schritt. Malst du nach einem Pass den Laufweg des Passgebers, läuft er im selben Schritt direkt nach dem Abspiel los; andere Spieler im selben Schritt starten gleichzeitig mit dem Pass. <br><br>
         <u>Pass und Dribbling einstellen:</u> Pass antippen → "〰️ Flach" oder "⤴️ Hoch". Ein hoher Ball wird gepunktet dargestellt und steigt in der Animation mit Schatten auf. Beim Dribbling legt "🦶 Fuß" den ballführenden Fuß fest: "auto" wechselt vor jeder Kurve auf den äußeren Fuß, "rechts" oder "links" bleiben fest. <br><br>
         <u>Zweikampf:</u> Spieler auswählen, "⚔️ Zweikampf" tippen, dann den Gegenspieler antippen. Beide werden mit einer roten Zickzack-Linie verbunden und blinken in ihrem Schritt der Animation. <br><br>
+        <u>Kader & Formationen:</u> Über 👥 Kader legst du Mannschaften an und trägst Spieler mit Trikotnummer ein – einzeln oder als ganze Namensliste aus der Zwischenablage. „📋 Kader einfügen“ übernimmt den geteilten Spieltag aus dem Kaderplaner: direkt aufs Feld oder als gespeicherter Kader. Ein Tipp auf den Namen weist eine Rolle zu (Torwart, Abwehr, Mittelfeld, Sturm) oder macht den Spieler zum Kapitän – er bekommt ein kleines „K“ am Kreis. Spieler anhaken, Spielform (6+1, 8+1, 10+1) und Formation wählen, dann „Aufs Feld“: Der Torwart steht im Tor, die Abwehr hinten, der Sturm vorne, überzählige Spieler kommen auf die Bank am Feldrand. „Gegner aufstellen“ stellt die Gegner gespiegelt in derselben Formation auf. Kader lassen sich als Datei exportieren, z. B. für Co-Trainer oder als Sicherung. <br><br>
+        <u>Tauschen:</u> Spieler auswählen, "⇄ Tauschen" tippen, dann den zweiten Spieler antippen – beide tauschen die Plätze, z. B. bei einem Wechsel von der Bank. <br><br>
         Deine Taktiken lassen sich mitsamt Animation speichern, als Datei exportieren und auf anderen Geräten importieren – oder als Bild bzw. GIF teilen. <br><br>
         Entwickelt von <strong>Simon Mählmann</strong>.`,
         closeBtn: 'Schließen',
@@ -2758,6 +2911,9 @@ const translations = {
         msgTacticLoaded: (name) => 'Taktik "' + name + '" geladen.',
         msgAnimError: 'Animation abgebrochen (fehlerhafte Daten?).',
         importSquadBtn: '📋 Kader einfügen',
+        importSaveBtn: '💾 Als Kader speichern',
+        sqImportSaved: (name, n) => 'Kader „' + name + '“ gespeichert (' + n + ' Spieler).',
+        sqListAdded: (n, rest) => n + ' Spieler hinzugefügt' + (rest ? ', ' + rest + ' passten nicht mehr (max. 30).' : '.'),
         confirmDeleteTactic: 'Diese Taktik wirklich löschen?',
         confirmSwitchSport: 'Sportart wechseln? Das Feld wird dabei geleert.',
         msgArrowsRemoved: n => n === 1 ? 'Objekt und 1 zugehöriger Pfeil gelöscht.' : 'Objekt und ' + n + ' zugehörige Pfeile gelöscht.',
@@ -2806,7 +2962,7 @@ const translations = {
         msgImported: (n) => n + ' Taktik(en) importiert!',
         msgImportError: 'Import fehlgeschlagen – ungültige Datei.',
         obTitle: 'Willkommen bei TacticBoard!',
-        obText: `<strong>1. Aufstellen:</strong> 🔴 und 🔵 erstellen Spieler und Gegner. Kurzes Tippen auf das Ball-, Tor- oder Geräte-Symbol erstellt das zuletzt gewählte Objekt – <u>gedrückt halten</u> öffnet die volle Auswahl (Plättchen, Stangen, Leiter, Dummys, Auswechselbank, verschiedene Tore). <br><br>
+        obText: `<strong>1. Aufstellen:</strong> 🔴 und 🔵 erstellen Spieler und Gegner. Kurzes Tippen auf das Ball-, Tor- oder Geräte-Symbol erstellt das zuletzt gewählte Objekt – <u>gedrückt halten</u> öffnet die volle Auswahl (Plättchen, Stangen, Leiter, Dummys, Auswechselbank, verschiedene Tore). 👥 Kader speichert deine Mannschaft und stellt sie in einer Formation auf. <br><br>
         <strong>2. Pfeile:</strong> Objekt antippen → "➦ Pfeil". Ziehe einfach an der Pfeilspitze. "＋ Punkt" erzeugt Kurven und Kreise. <br><br>
         <strong>3. Animation:</strong> 🎬 einschalten, den Pfeilen Schritte und Tempo zuweisen, mit ▶ abspielen – 🔁 wiederholt endlos, 🎞️ speichert den Spielzug als GIF. Mit ✏️ kannst du Wege auch frei malen: Ein Strich, der auf einem Spieler beginnt, wird zum Laufweg (mit Ball: Dribbling), ein Strich vom Ball zum Pass. Pass antippen → flach oder hoch. ⚔️ Zweikampf: Spieler wählen, dann den Gegenspieler antippen. <br><br>
         <strong>4. Sichern & Teilen:</strong> 💾 speichert die Taktik, 📤 exportiert sie als Datei für andere Geräte oder Co-Trainer.`,
@@ -2841,7 +2997,62 @@ const translations = {
         goalTitle: 'Tor wählen',
         netTitle: 'Netz wählen',
         equipNames: { ball:'Ball', cone:'Hütchen', disc:'Plättchen', pole:'Stange', ladder:'Koordinationsleiter', dummy:'Freistoßdummy', bench:'Auswechselbank' },
-        goalNames: { goal:'Großtor', smallgoal:'Kleintor', minigoal:'Minitor', basket:'Korb', net:'Netz', smallnet:'Mininetz' }
+        goalNames: { goal:'Großtor', smallgoal:'Kleintor', minigoal:'Minitor', basket:'Korb', net:'Netz', smallnet:'Mininetz' },
+        swapBtn: '⇄ Tauschen',
+        msgSwapPick: 'Jetzt den zweiten Spieler antippen',
+        msgSwapped: 'Plätze getauscht.',
+        squadBtn: '👥 Kader',
+        sqTitle: 'Kader',
+        sqNoSquad: '– noch kein Kader –',
+        sqNewBtn: '＋ Neu',
+        sqRenameTitle: 'Kader umbenennen',
+        sqDeleteTitle: 'Kader löschen',
+        sqNamePlaceholder: 'Name des Kaders',
+        sqNameOk: '✔ OK',
+        sqEmptyHint: 'Lege zuerst einen Kader an: „＋ Neu“ tippen und einen Namen eingeben.',
+        sqSecPlayers: 'Spieler',
+        sqSecLineup: 'Aufstellung',
+        sqSecFile: 'Sichern & Teilen',
+        sqPlayerPlaceholder: 'Spielername',
+        sqNrPlaceholder: 'Nr.',
+        sqAddTitle: 'Spieler hinzufügen',
+        sqTapHint: 'Namen antippen für Rolle, Kapitän oder Entfernen. Häkchen = spielt mit. Tipp: Eine ganze Namensliste (eine Zeile pro Spieler) lässt sich ins Namensfeld einfügen.',
+        sqListEmpty: 'Noch keine Spieler – oben Namen (und Nummer) eintragen oder eine Namensliste einfügen.',
+        sqAll: 'Alle',
+        sqNone: 'Keine',
+        sqCount: (n, g) => n + ' von ' + g + ' ausgewählt',
+        sqRoleNames: { tw:'Torwart', def:'Abwehr', mid:'Mittelfeld', att:'Sturm' },
+        sqRoleShort: { tw:'TW', def:'ABW', mid:'MF', att:'ST' },
+        sqCaptainBtn: '⭐ Kapitän',
+        sqCapShort: 'K',
+        sqRemoveBtn: '🗑️ Entfernen',
+        sqFormLabel: 'Spielform',
+        sqFormationLabel: 'Formation',
+        sqFree: 'Frei (ohne Formation)',
+        sqShowNr: 'Trikotnummer statt Name im Kreis',
+        sqSportHint: 'Formationen gibt es nur beim Fußball – hier werden die Spieler frei aufgestellt.',
+        sqRuleHint: 'Torwart ins Tor, Abwehr hinten, Sturm vorne. Spieler ohne Rolle füllen freie Plätze, überzählige kommen auf die Bank am Feldrand.',
+        sqApplyBtn: n => '✅ ' + n + ' aufs Feld',
+        sqEnemyBtn: '🔵 Gegner aufstellen',
+        sqExportBtn: '📤 Kader exportieren',
+        sqImportBtn: '📥 Kader importieren',
+        sqPlaced: (n, b) => n + ' Spieler aufs Feld gesetzt' + (b ? ', davon ' + b + ' auf der Bank.' : '.'),
+        sqEnemyPlaced: f => 'Gegner in ' + f + ' aufgestellt.',
+        sqNoneSelected: 'Keine Spieler ausgewählt.',
+        sqNameMissing: 'Bitte einen Namen eingeben.',
+        sqNameExists: 'Einen Kader mit diesem Namen gibt es schon.',
+        sqFull: 'Mehr als 30 Spieler pro Kader sind nicht möglich.',
+        sqTooMany: 'Mehr als 30 Kader sind nicht möglich.',
+        sqConfirmDelete: 'Diesen Kader wirklich löschen?',
+        sqConfirmDeletePlayer: 'Diesen Spieler aus dem Kader entfernen?',
+        sqConfirmReplace: 'Deine Spieler auf dem Feld werden durch den Kader ersetzt. Weiter?',
+        sqConfirmReplaceEnemy: 'Die Gegner auf dem Feld werden neu aufgestellt. Weiter?',
+        sqBusy: 'Bitte erst die Animation stoppen.',
+        sqNoSquads: 'Keine Kader vorhanden.',
+        sqExported: 'Kader exportiert!',
+        sqImported: n => n + ' Kader importiert!',
+        sqImportError: 'Import fehlgeschlagen – keine Kader-Datei.',
+        sqEnemyNeedsFormation: 'Für die Gegner zuerst Spielform und Formation wählen (nur Fußball).'
     },
     en: {
         sportNames: { football:'Football', basketball:'Basketball', handball:'Handball', volleyball:'Volleyball', icehockey:'Ice Hockey' },
@@ -2880,6 +3091,8 @@ const translations = {
         <u>Drawing moves:</u> With 🎬 Animation enabled, simply draw a line with ✏️ Draw: if it starts on a player it becomes a run (dashed) – if the ball is at the player's feet, a dribble (wavy line). If it starts on the ball it becomes a pass. Players follow the drawn line smoothly, including slaloms and changes of direction. Each new path automatically gets the next step. If you draw the passer's run after a pass, he starts in the same step right after playing the ball; other players in that step start together with the pass. <br><br>
         <u>Pass and dribble options:</u> Tap a pass → "〰️ Low" or "⤴️ High". A high ball is shown dotted and rises with a shadow during the animation. For a dribble, "🦶 Foot" sets the ball-carrying foot: "auto" switches to the outside foot before each turn, "right" or "left" stay fixed. <br><br>
         <u>Duel:</u> Select a player, tap "⚔️ Duel", then tap the opponent. Both are linked by a red zigzag line and flash during their animation step. <br><br>
+        <u>Squads & formations:</u> Use 👥 Squad to create teams and enter players with shirt numbers – one by one or as a whole name list from the clipboard. “📋 Paste squad” takes the shared matchday from the squad planner: straight onto the pitch or as a saved squad. Tap a name to assign a position (goalkeeper, defence, midfield, attack) or make the player captain – the circle gets a small “C”. Tick the players, choose a format (6+1, 8+1, 10+1) and a formation, then tap “Place”: the goalkeeper stands in goal, defenders at the back, attackers up front, and extra players go to the bench at the edge. “Set up opponents” places the opponents mirrored in the same formation. Squads can be exported as a file, e.g. for co-coaches or as a backup. <br><br>
+        <u>Swap:</u> Select a player, tap "⇄ Swap", then tap the second player – both swap places, e.g. for a substitution from the bench. <br><br>
         Your tactics can be saved including the animation, exported as a file and imported on other devices – or shared as an image or GIF. <br><br>
         Developed by <strong>Simon Mählmann</strong>.`,
         closeBtn: 'Close',
@@ -2888,7 +3101,10 @@ const translations = {
         msgSaved: 'Tactic saved successfully!',
         msgTacticLoaded: (name) => 'Tactic "' + name + '" loaded.',
         msgAnimError: 'Animation aborted (invalid data?).',
-        importSquadBtn: '📋 Import squad',
+        importSquadBtn: '📋 Paste squad',
+        importSaveBtn: '💾 Save as squad',
+        sqImportSaved: (name, n) => 'Squad “' + name + '” saved (' + n + ' players).',
+        sqListAdded: (n, rest) => n + ' players added' + (rest ? ', ' + rest + ' did not fit (max. 30).' : '.'),
         confirmDeleteTactic: 'Really delete this tactic?',
         confirmSwitchSport: 'Switch sport? This clears the field.',
         msgArrowsRemoved: n => n === 1 ? 'Object and 1 attached arrow deleted.' : 'Object and ' + n + ' attached arrows deleted.',
@@ -2901,7 +3117,7 @@ const translations = {
         titleEnemy: 'Opponent',
         titlePenWidth: 'Pen width',
         titleEraserSize: 'Eraser size',
-        importTitle: 'Import squad',
+        importTitle: 'Paste squad',
         importHint: 'Share a matchday in the squad planner and paste the text below – the squad is detected right away. Players are placed as a starting line-up, extras go to the sideline.',
         importPasteBtn: '📋 From clipboard',
         importParseBtn: '🔍 Check again',
@@ -2937,7 +3153,7 @@ const translations = {
         msgImported: (n) => n + ' tactic(s) imported!',
         msgImportError: 'Import failed – invalid file.',
         obTitle: 'Welcome to TacticBoard!',
-        obText: `<strong>1. Set up:</strong> 🔴 and 🔵 create players and opponents. A short tap on the ball, goal or equipment icon creates the last selected object – <u>press and hold</u> opens the full selection (flat markers, poles, ladder, dummies, substitutes bench, different goals). <br><br>
+        obText: `<strong>1. Set up:</strong> 🔴 and 🔵 create players and opponents. A short tap on the ball, goal or equipment icon creates the last selected object – <u>press and hold</u> opens the full selection (flat markers, poles, ladder, dummies, substitutes bench, different goals). 👥 Squad saves your team and places it in a formation. <br><br>
         <strong>2. Arrows:</strong> Tap an object → "➦ Arrow". Simply drag the arrowhead. "＋ Point" creates curves and circles. <br><br>
         <strong>3. Animation:</strong> Enable 🎬, assign steps and pace to the arrows, play with ▶ – 🔁 loops endlessly, 🎞️ saves the play as a GIF. With ✏️ you can also draw paths freehand: a line starting on a player becomes a run (with the ball: a dribble), a line from the ball becomes a pass. Tap a pass → low or high. ⚔️ Duel: select a player, then tap the opponent. <br><br>
         <strong>4. Save & share:</strong> 💾 saves the tactic, 📤 exports it as a file for other devices or fellow coaches.`,
@@ -2972,12 +3188,68 @@ const translations = {
         goalTitle: 'Choose goal',
         netTitle: 'Choose net',
         equipNames: { ball:'Ball', cone:'Cone', disc:'Flat marker', pole:'Pole', ladder:'Agility ladder', dummy:'Free-kick dummy', bench:'Substitutes bench' },
-        goalNames: { goal:'Full goal', smallgoal:'Small goal', minigoal:'Mini goal', basket:'Basket', net:'Net', smallnet:'Mini net' }
+        goalNames: { goal:'Full goal', smallgoal:'Small goal', minigoal:'Mini goal', basket:'Basket', net:'Net', smallnet:'Mini net' },
+        swapBtn: '⇄ Swap',
+        msgSwapPick: 'Now tap the second player',
+        msgSwapped: 'Positions swapped.',
+        squadBtn: '👥 Squad',
+        sqTitle: 'Squads',
+        sqNoSquad: '– no squad yet –',
+        sqNewBtn: '＋ New',
+        sqRenameTitle: 'Rename squad',
+        sqDeleteTitle: 'Delete squad',
+        sqNamePlaceholder: 'Squad name',
+        sqNameOk: '✔ OK',
+        sqEmptyHint: 'Create a squad first: tap “＋ New” and enter a name.',
+        sqSecPlayers: 'Players',
+        sqSecLineup: 'Line-up',
+        sqSecFile: 'Back up & share',
+        sqPlayerPlaceholder: 'Player name',
+        sqNrPlaceholder: 'No.',
+        sqAddTitle: 'Add player',
+        sqTapHint: 'Tap a name for position, captain or removal. Tick = plays. Tip: you can paste a whole name list (one line per player) into the name field.',
+        sqListEmpty: 'No players yet – enter names (and numbers) above or paste a name list.',
+        sqAll: 'All',
+        sqNone: 'None',
+        sqCount: (n, g) => n + ' of ' + g + ' selected',
+        sqRoleNames: { tw:'Goalkeeper', def:'Defence', mid:'Midfield', att:'Attack' },
+        sqRoleShort: { tw:'GK', def:'DEF', mid:'MID', att:'FWD' },
+        sqCaptainBtn: '⭐ Captain',
+        sqCapShort: 'C',
+        sqRemoveBtn: '🗑️ Remove',
+        sqFormLabel: 'Format',
+        sqFormationLabel: 'Formation',
+        sqFree: 'Free (no formation)',
+        sqShowNr: 'Show shirt number instead of name',
+        sqSportHint: 'Formations are available for football only – players are placed freely here.',
+        sqRuleHint: 'Goalkeeper in goal, defenders at the back, attackers up front. Players without a position fill free spots, extra players go to the bench at the edge.',
+        sqApplyBtn: n => '✅ Place ' + n,
+        sqEnemyBtn: '🔵 Set up opponents',
+        sqExportBtn: '📤 Export squads',
+        sqImportBtn: '📥 Import squads',
+        sqPlaced: (n, b) => n + ' players placed' + (b ? ', ' + b + ' of them on the bench.' : '.'),
+        sqEnemyPlaced: f => 'Opponents set up in ' + f + '.',
+        sqNoneSelected: 'No players selected.',
+        sqNameMissing: 'Please enter a name.',
+        sqNameExists: 'A squad with this name already exists.',
+        sqFull: 'A squad can have at most 30 players.',
+        sqTooMany: 'At most 30 squads are possible.',
+        sqConfirmDelete: 'Really delete this squad?',
+        sqConfirmDeletePlayer: 'Remove this player from the squad?',
+        sqConfirmReplace: 'Your players on the pitch will be replaced by the squad. Continue?',
+        sqConfirmReplaceEnemy: 'The opponents on the pitch will be set up again. Continue?',
+        sqBusy: 'Please stop the animation first.',
+        sqNoSquads: 'No squads available.',
+        sqExported: 'Squads exported!',
+        sqImported: n => n + ' squad(s) imported!',
+        sqImportError: 'Import failed – not a squad file.',
+        sqEnemyNeedsFormation: 'Choose a format and formation for the opponents first (football only).'
     }
 };
 
 function applyLanguage(lang){
     LANG = lang;
+    document.documentElement.lang = lang;   // steuert u. a. K/C an der Kapitaensbinde
     try { localStorage.setItem('tb_lang', lang); } catch(e){}
     const t = translations[lang];
     document.querySelectorAll('.sport-btn-left').forEach(btn => { btn.textContent = t.sportNames[btn.dataset.sport]; });
@@ -3005,6 +3277,7 @@ function applyLanguage(lang){
     importPasteBtn.innerHTML = t.importPasteBtn;
     importParseBtn.innerHTML = t.importParseBtn;
     importApplyBtn.innerHTML = t.importApplyBtn;
+    importSaveBtn.innerHTML = t.importSaveBtn;
     importCloseBtn.textContent = t.closeBtn;
     deleteTacticBtn.innerHTML = t.deleteTacticBtn;
     exportImgBtn.innerHTML = t.exportImgBtn;
@@ -3031,6 +3304,8 @@ function applyLanguage(lang){
     stepLabelText.textContent = t.stepLabel;
     withBallBtn.innerHTML = t.withBallBtn;
     duelBtn.innerHTML = t.duelBtn;
+    swapBtn.innerHTML = t.swapBtn;
+    kaderTexte();
     syncFsPlay();
     updateButtonVisibility();   // Flug- und Fuss-Knopf in der neuen Sprache
     resetAnimBtn.innerHTML = t.resetAnimBtn;
@@ -3368,6 +3643,8 @@ let backExitArmed = 0;
 function closeTopmostLayer(){
     // 0. Rechtstext zuerst - er liegt ueber dem Ueber-Dialog, der offen bleiben soll
     if(legalModal.style.display === 'flex'){ legalModal.style.display = 'none'; return true; }
+    // Rueckfrage liegt ueber dem Kader-Dialog - nur sie schliessen
+    if(customConfirm.style.display === 'flex'){ confirmAction = null; customConfirm.style.display = 'none'; return true; }
 
     // 1. offene Dialoge
     const modals = [...document.querySelectorAll('.modal-overlay')]
@@ -3423,6 +3700,7 @@ const importParseBtn   = document.getElementById('import-parse-btn');
 const importPreview    = document.getElementById('import-preview');
 const importApplyBtn   = document.getElementById('import-apply-btn');
 const importCloseBtn   = document.getElementById('import-close-btn');
+const importSaveBtn    = document.getElementById('import-save-btn');
 
 let importBlocks = [];
 let importSel = -1;
@@ -3531,6 +3809,7 @@ function renderImportPreview(){
         importPreview.appendChild(div);
     });
     importApplyBtn.disabled = importSel < 0;
+    importSaveBtn.disabled = importSel < 0;
 }
 
 /* Beim automatischen Pruefen keine Meldung zeigen: waehrend des Einfuegens
@@ -3538,7 +3817,7 @@ function renderImportPreview(){
 function runImportParseQuiet(){
     importBlocks = parseSquadText(importTextArea.value);
     importSel = importBlocks.length ? 0 : -1;
-    if(!importBlocks.length){ importPreview.innerHTML = ''; importApplyBtn.disabled = true; return; }
+    if(!importBlocks.length){ importPreview.innerHTML = ''; importApplyBtn.disabled = true; importSaveBtn.disabled = true; return; }
     renderImportPreview();
 }
 
@@ -3548,6 +3827,7 @@ function runImportParse(){
     if(!importBlocks.length){
         importPreview.innerHTML = '';
         importApplyBtn.disabled = true;
+        importSaveBtn.disabled = true;
         showToast(translations[LANG].msgImportNoSquad);
         return;
     }
@@ -3601,7 +3881,9 @@ function applySquadToField(block){
 
 importSquadBtn.addEventListener('click', () => {
     importBlocks = []; importSel = -1;
-    importPreview.innerHTML = ''; importApplyBtn.disabled = true;
+    importPreview.innerHTML = ''; importApplyBtn.disabled = true; importSaveBtn.disabled = true;
+    // Der Knopf sitzt im Kader-Dialog - der weicht, damit nur ein Dialog offen ist
+    squadModal.style.display = 'none';
     importSquadModal.style.display = 'flex';
 });
 importCloseBtn.addEventListener('click', () => importSquadModal.style.display = 'none');
@@ -3782,7 +4064,7 @@ exportTacticsBtn.addEventListener('click', () => {
    Der JSON-Import ist die einzige Stelle, an der fremde Daten in die App
    kommen. Alles wird auf bekannte Werte zurechtgestutzt; was nicht passt,
    faellt weg, statt als kaputtes Objekt auf dem Feld zu landen. */
-const ALLOWED_CLASSES = ['player','enemy','ball','handball','puck','cone','item-obj','disc','pole','dummy','ladder','bench'];
+const ALLOWED_CLASSES = ['player','enemy','ball','handball','puck','cone','item-obj','disc','pole','dummy','ladder','bench','captain'];
 const ALLOWED_SPORTS  = ['football','basketball','handball','volleyball','icehockey'];
 const ALLOWED_PACE    = ['slow','normal','fast'];
 
@@ -3906,6 +4188,13 @@ importFileInput.addEventListener('change', () => {
             // Datei unterwegs durch Mail- oder Messenger-Apps gelaufen ist)
             const text = String(reader.result || '').replace(/^\uFEFF/, '').trim();
             const data = JSON.parse(text);
+            // Eine Kader-Datei im Taktik-Import: nicht ablehnen, sondern als Kader uebernehmen
+            if(data && data.kind === 'squads' && Array.isArray(data.squads)){
+                const n = kaderImportieren(data.squads);
+                showToast(n ? translations[LANG].sqImported(n) : translations[LANG].sqImportError);
+                importFileInput.value = '';
+                return;
+            }
             let incoming = Array.isArray(data) ? data : (data.tactics || (data.players ? [data] : []));
             // Fremde Dateien werden nicht ungeprueft uebernommen: nur bekannte
             // Klassen, Zahlen in gueltigen Bereichen, Rest wird verworfen
@@ -4004,6 +4293,724 @@ document.getElementById('show-imprint-btn')
     .addEventListener('click', () => zeigeRechtstext('impressum', 'legalImprint'));
 document.getElementById('close-legal-btn')
     .addEventListener('click', () => { legalModal.style.display = 'none'; });
+
+/* ---------------------------------------------------
+   KADER: gespeicherte Mannschaften, Rollen, Formationen
+
+   Ein Kader ist eine benannte Spielerliste.
+   Je Spieler: Name, Trikotnummer, Rolle (TW/Abwehr/Mittelfeld/Sturm),
+   Kapitaen und ob er mitspielt (Haken). "Aufs Feld" ersetzt nur die
+   eigenen Spielerkreise - Gegner, Baelle, Tore, Geraete und Zeichnungen
+   bleiben stehen. Gespeichert wird lokal unter SQUAD_KEY.
+--------------------------------------------------- */
+const SQUAD_KEY = 'tacticboard_squads';
+const SQUAD_MAX_PLAYERS = 30;
+const SQUAD_MAX_SQUADS = 30;
+const SQUAD_ROLES = ['tw', 'def', 'mid', 'att'];
+const SQUAD_FORMS = ['4', '6', '8', '10', 'free'];
+/* Formationen je Spielform; die Ziffern laufen von hinten nach vorne
+   und ergeben zusammen die Zahl der Feldspieler (ohne Torwart). */
+const FORMATIONEN = {
+    '4':  ['2-2', '1-2-1', '2-1-1'],
+    '6':  ['2-3-1', '3-2-1', '2-2-2', '3-1-2'],
+    '8':  ['3-3-2', '3-2-3', '2-4-2', '3-4-1'],
+    '10': ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '4-1-4-1']
+};
+
+const squadBtn         = document.getElementById('squad-btn');
+const squadModal       = document.getElementById('squad-modal');
+const sqSelect         = document.getElementById('sq-select');
+const sqNewBtn         = document.getElementById('sq-new-btn');
+const sqRenameBtn      = document.getElementById('sq-rename-btn');
+const sqDeleteBtn      = document.getElementById('sq-delete-btn');
+const sqNameRow        = document.getElementById('sq-name-row');
+const sqNameInput      = document.getElementById('sq-name-input');
+const sqNameOk         = document.getElementById('sq-name-ok');
+const sqNameCancel     = document.getElementById('sq-name-cancel');
+const sqEmptyHint      = document.getElementById('sq-empty-hint');
+const sqBody           = document.getElementById('sq-body');
+const sqAddName        = document.getElementById('sq-add-name');
+const sqAddNr          = document.getElementById('sq-add-nr');
+const sqAddBtn         = document.getElementById('sq-add-btn');
+const sqTapHint        = document.getElementById('sq-tap-hint');
+const sqList           = document.getElementById('sq-list');
+const sqAllBtn         = document.getElementById('sq-all-btn');
+const sqNoneBtn        = document.getElementById('sq-none-btn');
+const sqCount          = document.getElementById('sq-count');
+const sqForm           = document.getElementById('sq-form');
+const sqFormation      = document.getElementById('sq-formation');
+const sqFormationRow   = document.getElementById('sq-formation-row');
+const sqSportHint      = document.getElementById('sq-sport-hint');
+const sqShowNr         = document.getElementById('sq-show-nr');
+const sqApplyBtn       = document.getElementById('sq-apply-btn');
+const sqEnemyBtn       = document.getElementById('sq-enemy-btn');
+const sqExportBtn      = document.getElementById('sq-export-btn');
+const sqImportBtn      = document.getElementById('sq-import-btn');
+const sqImportInput    = document.getElementById('sq-import-input');
+const sqCloseBtn       = document.getElementById('sq-close-btn');
+
+let sqOffen = '';        // id des aufgeklappten Spielers (Rollenwahl)
+let sqNamensModus = '';  // 'neu' | 'umbenennen' | ''
+
+function kaderNeueId(){ return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function kaderIdSauber(raw){ return String(raw || '').replace(/[^\w-]/g, '').slice(0, 30); }
+function kaderNameSauber(raw, max){ return String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim().slice(0, max); }
+
+function kaderSpielerSauber(p){
+    if(!p || typeof p !== 'object') return null;
+    const name = kaderNameSauber(p.name, 30);
+    if(!name) return null;
+    return {
+        id: kaderIdSauber(p.id) || kaderNeueId(),
+        name,
+        nr: String(p.nr == null ? '' : p.nr).replace(/\D/g, '').slice(0, 3),
+        role: SQUAD_ROLES.indexOf(p.role) !== -1 ? p.role : '',
+        captain: p.captain === true,
+        sel: p.sel !== false
+    };
+}
+function formationGueltig(form, formation){
+    const liste = FORMATIONEN[form];
+    if(!liste) return '';
+    return liste.indexOf(formation) !== -1 ? formation : liste[0];
+}
+function kaderSauber(k){
+    if(!k || typeof k !== 'object') return null;
+    const name = kaderNameSauber(k.name, 40);
+    if(!name) return null;
+    const players = (Array.isArray(k.players) ? k.players : []).slice(0, SQUAD_MAX_PLAYERS).map(kaderSpielerSauber).filter(Boolean);
+    // ids eindeutig halten und hoechstens einen Kapitaen zulassen
+    const ids = new Set(); let kapitaen = false;
+    players.forEach(p => {
+        while(ids.has(p.id)) p.id = kaderNeueId();
+        ids.add(p.id);
+        if(p.captain){ if(kapitaen) p.captain = false; kapitaen = true; }
+    });
+    const form = SQUAD_FORMS.indexOf(String(k.form)) !== -1 ? String(k.form) : '6';
+    return { id: kaderIdSauber(k.id) || kaderNeueId(), name, players, form, formation: formationGueltig(form, k.formation), showNr: k.showNr === true };
+}
+function kaderLaden(){
+    const leer = { squads: [], current: '', lose: { form: '6', formation: '2-3-1', showNr: false } };
+    let roh = null;
+    try { roh = JSON.parse(localStorage.getItem(SQUAD_KEY) || 'null'); } catch(e){ roh = null; }
+    if(!roh || typeof roh !== 'object') return leer;
+    const squads = (Array.isArray(roh.squads) ? roh.squads : []).slice(0, SQUAD_MAX_SQUADS).map(kaderSauber).filter(Boolean);
+    const ids = new Set();
+    squads.forEach(k => { while(ids.has(k.id)) k.id = kaderNeueId(); ids.add(k.id); });
+    const current = squads.some(k => k.id === roh.current) ? roh.current : (squads[0] ? squads[0].id : '');
+    const lr = roh.lose && typeof roh.lose === 'object' ? roh.lose : {};
+    const loseForm = SQUAD_FORMS.indexOf(String(lr.form)) !== -1 ? String(lr.form) : '6';
+    return { squads, current, lose: { form: loseForm, formation: formationGueltig(loseForm, lr.formation), showNr: lr.showNr === true } };
+}
+let squadData = kaderLaden();
+
+function kaderSpeichern(){
+    try {
+        localStorage.setItem(SQUAD_KEY, JSON.stringify(squadData));
+        return true;
+    } catch(e){
+        showToast(translations[LANG].msgSaveFailed);
+        return false;
+    }
+}
+function aktuellerKader(){ return squadData.squads.find(k => k.id === squadData.current) || null; }
+/* Spielform/Formation haengen am Kader; ohne Kader (nur Gegner aufstellen)
+   gelten lose Einstellungen. */
+function kaderEinstellungen(){ return aktuellerKader() || squadData.lose; }
+
+/* ---------- Kreise auf dem Feld ---------- */
+function istFeldspielerKreis(el){
+    const c = el.classList;
+    if(!c.contains('player')) return false;
+    return !['ball', 'cone', 'item-obj', 'disc', 'pole', 'dummy', 'puck', 'handball', 'ladder', 'bench'].some(x => c.contains(x));
+}
+function kreiseVonSeite(gegner){
+    return [...field.querySelectorAll('.player')].filter(el => istFeldspielerKreis(el) && el.classList.contains('enemy') === gegner);
+}
+/* Entfernt die Kreise einer Seite samt zugehoeriger Pfeile und Zweikaempfe -
+   wie beim einzelnen Loeschen sollen keine Geisterpfeile stehen bleiben. */
+function kreiseEntfernen(gegner){
+    if(duelSource) duelAbbrechen();
+    if(swapSource) swapAbbrechen();
+    const weg = kreiseVonSeite(gegner);
+    const oids = new Set(weg.map(el => el.dataset.oid).filter(Boolean));
+    field.querySelectorAll('.arrow-container').forEach(a => {
+        if(oids.has(a.dataset.targetOid) || oids.has(a.dataset.withOid)){
+            if(a === activeArrow) activeArrow = null;
+            a.remove();
+        }
+    });
+    weg.forEach(el => { if(el === activePlayer) activePlayer = null; el.remove(); });
+}
+/* Nach dem Abspielen stehen alle Objekte auf Endpositionen. Vor dem
+   Neuaufstellen erst zurueck auf den Start, sonst bliebe der Ball dort stehen. */
+function animationsstandAufloesen(){
+    if(animBaseline){ restoreBaseline(); clearAnimBaseline(); }
+}
+
+/* ---------- Positionen ---------- */
+/* Mittelpunkte in Prozent, eigenes Tor links. Die Linien verteilen sich
+   gleichmaessig zwischen Abwehr (x=20) und Sturm (x=56/58), die Spieler
+   einer Linie symmetrisch um die Mittellinie des Feldes. */
+function formationsPlaetze(formation){
+    const linien = String(formation || '').split('-').map(n => parseInt(n, 10)).filter(n => n > 0);
+    const L = linien.length;
+    const x0 = 20, x1 = L >= 4 ? 58 : 56;
+    const plaetze = [];
+    linien.forEach((n, i) => {
+        const x = L === 1 ? 38 : x0 + i * (x1 - x0) / (L - 1);
+        const linie = i === 0 ? 'def' : (i === L - 1 ? 'att' : 'mid');
+        const abstand = n <= 1 ? 0 : Math.min(26, 60 / (n - 1));
+        for(let j = 0; j < n; j++){
+            plaetze.push({ x: +x.toFixed(2), y: +(50 + (j - (n - 1) / 2) * abstand).toFixed(2), linie, frei: true });
+        }
+    });
+    return plaetze;
+}
+/* Bank: unterer Feldrand, dann oberer, dann eine zweite Reihe unten */
+function bankPlatz(i){
+    const reihe = Math.floor(i / 10), spalte = i % 10;
+    const cy = reihe === 0 ? 93.25 : reihe === 1 ? 6.75 : 79.75;
+    return { x: 5.5 + spalte * 9, y: cy };
+}
+
+/* Verteilt die ausgewaehlten Spieler auf Plaetze.
+   1. Erster Torwart ins Tor, weitere Torhueter auf die Bank.
+   2. Abwehr/Mittelfeld/Sturm auf freie Plaetze ihrer Linie.
+   3. Ueberzaehlige mit Rolle in die naechste Linie (Abwehr -> Mittelfeld ...).
+   4. Spieler ohne Rolle fuellen freie Feldplaetze, zuletzt das Tor.
+   5. Der Rest kommt auf die Bank - in Kader-Reihenfolge. */
+function aufstellungPlanen(spieler, form, formation, mitTor){
+    const plan = [];
+    if(form === 'free'){
+        const liste = spieler.slice();
+        const tw = liste.findIndex(p => p.role === 'tw');
+        if(tw >= 0){
+            const k = liste.splice(tw, 1)[0];
+            if(mitTor) plan.push({ p: k, x: 6, y: 50 });
+            else liste.unshift(k);
+        }
+        liste.forEach((p, i) => plan.push({ p, x: 16 + (i % 5) * 8.5, y: 12 + Math.floor(i / 5) * 15.3 }));
+        return { plan, bank: 0 };
+    }
+    const plaetze = formationsPlaetze(formation);
+    const tor = { x: 6, y: 50, linie: 'tw', frei: true };
+    const gesetzt = new Set();
+    const setze = (p, pl) => { pl.frei = false; gesetzt.add(p.id); plan.push({ p, x: pl.x, y: pl.y }); };
+    const freierPlatz = linie => plaetze.find(pl => pl.frei && pl.linie === linie);
+    const NACHBARN = { def: ['mid', 'att'], mid: ['att', 'def'], att: ['mid', 'def'] };
+
+    const torhueter = spieler.find(p => p.role === 'tw');
+    if(torhueter) setze(torhueter, tor);
+    const ueber = [];
+    spieler.forEach(p => {
+        if(p.role === 'def' || p.role === 'mid' || p.role === 'att'){
+            const pl = freierPlatz(p.role);
+            if(pl) setze(p, pl); else ueber.push(p);
+        }
+    });
+    ueber.forEach(p => {
+        for(const l of NACHBARN[p.role]){
+            const pl = freierPlatz(l);
+            if(pl){ setze(p, pl); break; }
+        }
+    });
+    spieler.forEach(p => {
+        if(p.role || gesetzt.has(p.id)) return;
+        const pl = plaetze.find(x => x.frei) || (tor.frei ? tor : null);
+        if(pl) setze(p, pl);
+    });
+    let b = 0;
+    spieler.forEach(p => {
+        if(gesetzt.has(p.id)) return;
+        const pl = bankPlatz(b++);
+        plan.push({ p, x: pl.x, y: pl.y });
+    });
+    return { plan, bank: b };
+}
+
+/* Beschriftung: Trikotnummer oder eindeutiger Kurzname */
+function kaderBeschriftungen(spieler, mitNummer){
+    const namen = squadDisplayNames(spieler.map(p => ({ name: p.name, number: p.nr })));
+    const m = new Map();
+    spieler.forEach((p, i) => m.set(p.id, (mitNummer && p.nr) ? p.nr : namen[i]));
+    return m;
+}
+
+function kaderAufsFeld(){
+    const t = translations[LANG];
+    const k = aktuellerKader();
+    if(!k) return;
+    if(isAnimating){ showToast(t.sqBusy); return; }
+    const spieler = k.players.filter(p => p.sel);
+    if(!spieler.length){ showToast(t.sqNoneSelected); return; }
+    const ausfuehren = () => {
+        const fussball = currentSport === 'football';
+        const form = fussball ? k.form : 'free';
+        const { plan, bank } = aufstellungPlanen(spieler, form, k.formation, fussball);
+        animationsstandAufloesen();
+        selectPlayer(null);
+        kreiseEntfernen(false);
+        const labels = kaderBeschriftungen(spieler, k.showNr);
+        plan.forEach(({ p, x, y }) => {
+            const st = centerToStyle(x, y);
+            const el = createObject(p.captain ? 'player captain' : 'player', labels.get(p.id), st.left, st.top, 9, true);
+            setupDoubleClickToggle(el);
+        });
+        squadModal.style.display = 'none';
+        updateButtonVisibility();
+        showToast(t.sqPlaced(plan.length, bank));
+    };
+    if(kreiseVonSeite(false).length) askConfirm('sqConfirmReplace', ausfuehren);
+    else ausfuehren();
+}
+
+function gegnerAufstellen(){
+    const t = translations[LANG];
+    const e = kaderEinstellungen();
+    if(currentSport !== 'football' || e.form === 'free' || !FORMATIONEN[e.form]){ showToast(t.sqEnemyNeedsFormation); return; }
+    if(isAnimating){ showToast(t.sqBusy); return; }
+    const formation = formationGueltig(e.form, e.formation);
+    const ausfuehren = () => {
+        animationsstandAufloesen();
+        selectPlayer(null);
+        kreiseEntfernen(true);
+        const plaetze = [{ x: 6, y: 50 }].concat(formationsPlaetze(formation));
+        plaetze.forEach((pl, i) => {
+            const st = centerToStyle(100 - pl.x, pl.y);
+            const el = createObject('player enemy', String(i + 1), st.left, st.top, 9, true);
+            setupDoubleClickToggle(el);
+        });
+        enemyCounter = plaetze.length;
+        squadModal.style.display = 'none';
+        updateButtonVisibility();
+        showToast(t.sqEnemyPlaced(e.form + '+1 · ' + formation));
+    };
+    if(kreiseVonSeite(true).length) askConfirm('sqConfirmReplaceEnemy', ausfuehren);
+    else ausfuehren();
+}
+
+/* ---------- Dialog aufbauen ---------- */
+function kaderTexte(){
+    const t = translations[LANG];
+    squadBtn.innerHTML = t.squadBtn;
+    document.getElementById('sq-title').textContent = t.sqTitle;
+    sqNewBtn.innerHTML = t.sqNewBtn;
+    sqRenameBtn.title = t.sqRenameTitle;
+    sqDeleteBtn.title = t.sqDeleteTitle;
+    sqNameInput.placeholder = t.sqNamePlaceholder;
+    sqNameOk.innerHTML = t.sqNameOk;
+    document.getElementById('sq-sec-players').textContent = t.sqSecPlayers;
+    document.getElementById('sq-sec-lineup').textContent = t.sqSecLineup;
+    document.getElementById('sq-sec-file').textContent = t.sqSecFile;
+    sqAddName.placeholder = t.sqPlayerPlaceholder;
+    sqAddNr.placeholder = t.sqNrPlaceholder;
+    sqAddBtn.title = t.sqAddTitle;
+    sqTapHint.textContent = t.sqTapHint;
+    sqAllBtn.textContent = t.sqAll;
+    sqNoneBtn.textContent = t.sqNone;
+    document.getElementById('sq-form-label').textContent = t.sqFormLabel;
+    document.getElementById('sq-formation-label').textContent = t.sqFormationLabel;
+    document.getElementById('sq-show-nr-text').textContent = t.sqShowNr;
+    sqEnemyBtn.innerHTML = t.sqEnemyBtn;
+    sqExportBtn.innerHTML = t.sqExportBtn;
+    sqImportBtn.innerHTML = t.sqImportBtn;
+    sqCloseBtn.textContent = t.closeBtn;
+    kaderRendern();
+}
+
+function kaderRendern(){
+    const t = translations[LANG];
+    const k = aktuellerKader();
+
+    // Auswahlliste
+    sqSelect.innerHTML = '';
+    if(!squadData.squads.length){
+        const o = document.createElement('option');
+        o.value = ''; o.textContent = t.sqNoSquad;
+        sqSelect.appendChild(o);
+    } else {
+        squadData.squads.forEach(x => {
+            const o = document.createElement('option');
+            o.value = x.id; o.textContent = x.name;
+            sqSelect.appendChild(o);
+        });
+    }
+    sqSelect.value = k ? k.id : '';
+    sqSelect.disabled = !squadData.squads.length;
+    sqRenameBtn.disabled = sqDeleteBtn.disabled = !k;
+    sqNameRow.style.display = sqNamensModus ? 'flex' : 'none';
+
+    sqEmptyHint.textContent = k ? '' : t.sqEmptyHint;
+    sqEmptyHint.style.display = k ? 'none' : '';
+    sqBody.style.display = k ? '' : 'none';
+
+    // Spielerliste
+    sqList.innerHTML = '';
+    if(k){
+        if(!k.players.length){
+            const leer = document.createElement('div');
+            leer.className = 'sq-hint';
+            leer.textContent = t.sqListEmpty;
+            sqList.appendChild(leer);
+        }
+        k.players.forEach(p => sqList.appendChild(kaderZeile(k, p)));
+        const n = k.players.filter(p => p.sel).length;
+        sqCount.textContent = t.sqCount(n, k.players.length);
+        sqTapHint.style.display = k.players.length ? '' : 'none';
+        sqAddBtn.disabled = k.players.length >= SQUAD_MAX_PLAYERS;
+    }
+
+    // Aufstellung
+    const e = kaderEinstellungen();
+    const fussball = currentSport === 'football';
+    sqForm.innerHTML = '';
+    SQUAD_FORMS.forEach(f => {
+        const o = document.createElement('option');
+        o.value = f; o.textContent = f === 'free' ? t.sqFree : f + '+1';
+        sqForm.appendChild(o);
+    });
+    sqForm.value = e.form;
+    sqFormation.innerHTML = '';
+    (FORMATIONEN[e.form] || []).forEach(f => {
+        const o = document.createElement('option');
+        o.value = f; o.textContent = f;
+        sqFormation.appendChild(o);
+    });
+    if(FORMATIONEN[e.form]) sqFormation.value = formationGueltig(e.form, e.formation);
+    sqFormationRow.style.display = (fussball && FORMATIONEN[e.form]) ? 'flex' : 'none';
+    sqForm.disabled = !fussball;
+    sqSportHint.style.display = '';
+    sqSportHint.textContent = fussball ? (e.form === 'free' ? '' : t.sqRuleHint) : t.sqSportHint;
+    if(!sqSportHint.textContent) sqSportHint.style.display = 'none';
+    sqShowNr.checked = !!e.showNr;
+    sqShowNr.disabled = !k;
+
+    const n = k ? k.players.filter(p => p.sel).length : 0;
+    sqApplyBtn.innerHTML = t.sqApplyBtn(n);
+    sqApplyBtn.disabled = !k || n === 0;
+    sqEnemyBtn.style.display = (fussball && e.form !== 'free') ? '' : 'none';
+    sqExportBtn.disabled = !squadData.squads.length;
+}
+
+function kaderZeile(k, p){
+    const t = translations[LANG];
+    const box = document.createElement('div');
+    box.className = 'sq-player' + (sqOffen === p.id ? ' open' : '');
+
+    const zeile = document.createElement('div');
+    zeile.className = 'sq-line';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = p.sel;
+    cb.addEventListener('change', () => { p.sel = cb.checked; kaderSpeichern(); kaderRendern(); });
+    const nr = document.createElement('span');
+    nr.className = 'sq-nr'; nr.textContent = p.nr;
+    const name = document.createElement('span');
+    name.className = 'sq-name'; name.textContent = p.name;
+    name.addEventListener('click', () => { sqOffen = sqOffen === p.id ? '' : p.id; kaderRendern(); });
+    zeile.appendChild(cb); zeile.appendChild(nr); zeile.appendChild(name);
+    if(p.role){
+        const tag = document.createElement('span');
+        tag.className = 'sq-tag'; tag.textContent = t.sqRoleShort[p.role];
+        zeile.appendChild(tag);
+    }
+    if(p.captain){
+        const tag = document.createElement('span');
+        tag.className = 'sq-tag cap'; tag.textContent = t.sqCapShort;
+        zeile.appendChild(tag);
+    }
+    box.appendChild(zeile);
+
+    if(sqOffen === p.id){
+        const rollen = document.createElement('div');
+        rollen.className = 'sq-roles';
+        SQUAD_ROLES.forEach(r => {
+            const b = document.createElement('button');
+            b.textContent = t.sqRoleNames[r];
+            if(p.role === r) b.classList.add('on');
+            // nochmal tippen nimmt die Rolle wieder weg
+            b.addEventListener('click', () => { p.role = p.role === r ? '' : r; kaderSpeichern(); kaderRendern(); });
+            rollen.appendChild(b);
+        });
+        const kap = document.createElement('button');
+        kap.textContent = t.sqCaptainBtn;
+        if(p.captain) kap.classList.add('cap-on');
+        kap.addEventListener('click', () => {
+            const neu = !p.captain;
+            k.players.forEach(x => { x.captain = false; });   // nur ein Kapitaen
+            p.captain = neu;
+            kaderSpeichern(); kaderRendern();
+        });
+        rollen.appendChild(kap);
+        const del = document.createElement('button');
+        del.className = 'sq-del'; del.textContent = t.sqRemoveBtn;
+        del.addEventListener('click', () => askConfirm('sqConfirmDeletePlayer', () => {
+            const i = k.players.indexOf(p);
+            if(i >= 0) k.players.splice(i, 1);
+            sqOffen = '';
+            kaderSpeichern(); kaderRendern();
+        }));
+        rollen.appendChild(del);
+        box.appendChild(rollen);
+    }
+    return box;
+}
+
+function kaderSpielerHinzufuegen(){
+    const t = translations[LANG];
+    const k = aktuellerKader();
+    if(!k) return;
+    const name = kaderNameSauber(sqAddName.value, 30);
+    if(!name){ showToast(t.sqNameMissing); sqAddName.focus(); return; }
+    if(k.players.length >= SQUAD_MAX_PLAYERS){ showToast(t.sqFull); return; }
+    k.players.push({ id: kaderNeueId(), name, nr: String(sqAddNr.value || '').replace(/\D/g, '').slice(0, 3), role: '', captain: false, sel: true });
+    sqAddName.value = ''; sqAddNr.value = '';
+    kaderSpeichern(); kaderRendern();
+    sqAddName.focus();   // gleich den naechsten Namen eintippen
+}
+
+function kaderNamensfeldOeffnen(modus){
+    const k = aktuellerKader();
+    if(modus === 'neu' && squadData.squads.length >= SQUAD_MAX_SQUADS){ showToast(translations[LANG].sqTooMany); return; }
+    if(modus === 'umbenennen' && !k) return;
+    sqNamensModus = modus;
+    sqNameInput.value = modus === 'umbenennen' ? k.name : '';
+    kaderRendern();
+    sqNameInput.focus();
+}
+function kaderNameUebernehmen(){
+    const t = translations[LANG];
+    const name = kaderNameSauber(sqNameInput.value, 40);
+    if(!name){ showToast(t.sqNameMissing); sqNameInput.focus(); return; }
+    const k = aktuellerKader();
+    const doppelt = squadData.squads.some(x => x.name.toLowerCase() === name.toLowerCase() && !(sqNamensModus === 'umbenennen' && k && x.id === k.id));
+    if(doppelt){ showToast(t.sqNameExists); sqNameInput.focus(); return; }
+    if(sqNamensModus === 'umbenennen' && k){
+        k.name = name;
+    } else {
+        if(squadData.squads.length >= SQUAD_MAX_SQUADS){ showToast(t.sqTooMany); return; }
+        // neue Kader uebernehmen die zuletzt benutzte Spielform
+        const e = kaderEinstellungen();
+        const neu = { id: kaderNeueId(), name, players: [], form: e.form, formation: formationGueltig(e.form, e.formation), showNr: false };
+        squadData.squads.push(neu);
+        squadData.current = neu.id;
+        sqOffen = '';
+    }
+    const warNeu = sqNamensModus !== 'umbenennen';
+    sqNamensModus = '';
+    kaderSpeichern(); kaderRendern();
+    if(warNeu) sqAddName.focus();   // direkt den ersten Spieler eintragen
+}
+
+/* Uebernimmt Kader aus einer Datei. Gleicher Name = Kader wird ersetzt. */
+function kaderImportieren(liste){
+    if(!Array.isArray(liste)) return 0;
+    let n = 0;
+    liste.slice(0, SQUAD_MAX_SQUADS).forEach(roh => {
+        const k = kaderSauber(roh);
+        if(!k) return;
+        const i = squadData.squads.findIndex(x => x.name.toLowerCase() === k.name.toLowerCase());
+        if(i >= 0){ k.id = squadData.squads[i].id; squadData.squads[i] = k; }
+        else {
+            if(squadData.squads.length >= SQUAD_MAX_SQUADS) return;
+            while(squadData.squads.some(x => x.id === k.id)) k.id = kaderNeueId();
+            squadData.squads.push(k);
+        }
+        n++;
+        if(!aktuellerKader()) squadData.current = k.id;
+    });
+    if(n){ kaderSpeichern(); kaderRendern(); }
+    return n;
+}
+
+/* Geteilter Spieltag aus dem Kaderplaner -> gespeicherter Kader.
+   Gibt es den Kader (gleicher Mannschaftsname) schon, werden die Spieler
+   zusammengefuehrt: bekannte behalten Nummer, Rolle und Kapitaen, neue
+   kommen dazu. Angehakt sind genau die Spieler dieses Spieltags.
+   Die Ziffern vor den Namen im Teilen-Text sind eine Aufzaehlung, keine
+   Trikotnummern - sie werden deshalb nicht uebernommen. */
+function kaderAusSpieltag(block){
+    const t = translations[LANG];
+    const name = kaderNameSauber(block && block.team, 40);
+    if(!name) return;
+    let k = squadData.squads.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if(!k){
+        if(squadData.squads.length >= SQUAD_MAX_SQUADS){ showToast(t.sqTooMany); return; }
+        const form = String(fieldPlayersFor(block.team));   // "III" = 4+1, sonst 6+1
+        k = { id: kaderNeueId(), name, players: [], form, formation: formationGueltig(form, ''), showNr: false };
+        squadData.squads.push(k);
+    }
+    const dabei = new Set();
+    block.players.forEach(bp => {
+        const nm = kaderNameSauber(bp.name, 30);
+        if(!nm) return;
+        let p = k.players.find(x => x.name.toLowerCase() === nm.toLowerCase());
+        if(!p){
+            if(k.players.length >= SQUAD_MAX_PLAYERS) return;
+            p = { id: kaderNeueId(), name: nm, nr: '', role: '', captain: false, sel: true };
+            k.players.push(p);
+        }
+        if(bp.keeper) p.role = 'tw';
+        dabei.add(p.id);
+    });
+    k.players.forEach(p => { p.sel = dabei.has(p.id); });
+    squadData.current = k.id;
+    sqOffen = ''; sqNamensModus = '';
+    kaderSpeichern();
+    importSquadModal.style.display = 'none';
+    kaderRendern();
+    squadModal.style.display = 'flex';
+    showToast(t.sqImportSaved(k.name, dabei.size));
+}
+
+/* Namensliste aus der Zwischenablage, eine Zeile pro Spieler.
+   Erkannt werden "7 Luca", "7. Luca", "Luca 7", "Luca (7)", "Luca #7"
+   sowie (TW)/(GK) fuer den Torwart. Ist die Liste schlicht durchgezaehlt
+   (1. 2. 3. ...), sind die Ziffern keine Trikotnummern. Ein kompletter
+   Teilen-Text aus dem Kaderplaner wird ebenfalls erkannt. */
+function namenslisteLesen(text){
+    const bloecke = parseSquadText(text);
+    if(bloecke.length) return bloecke[0].players.map(p => ({ name: p.name, nr: '', tw: p.keeper }));
+    let aufzaehlung = true, n = 0;
+    const liste = String(text || '').replace(/\r/g, '').split('\n').map(zeile => {
+        let z = zeile.replace(/[*_]/g, '').replace(/^\s*[-•·–]\s*/, '').trim();
+        if(!z) return null;
+        let tw = false;
+        const RE_TW = /\(\s*(TW|GK)\s*\)|\s(TW|GK)$/i;
+        if(RE_TW.test(z)){ tw = true; z = z.replace(/\(\s*(TW|GK)\s*\)/ig, '').replace(/\s(TW|GK)$/i, '').trim(); }
+        let nr = '', m, gezaehlt = false;
+        if((m = z.match(/^(\d{1,3})\s*([.):-]?)\s+(.+)$/))){ nr = m[1]; gezaehlt = m[2] === '.' || m[2] === ')'; z = m[3]; }
+        else if((m = z.match(/^(.+?)\s*[(#]\s*(\d{1,3})\s*\)?$/)) || (m = z.match(/^(.+?)\s+(\d{1,3})$/))){ z = m[1]; nr = m[2]; }
+        const name = kaderNameSauber(z, 30);
+        if(!name) return null;
+        n++;
+        if(!gezaehlt || parseInt(nr, 10) !== n) aufzaehlung = false;
+        return { name, nr, tw };
+    }).filter(Boolean);
+    if(aufzaehlung) liste.forEach(p => { p.nr = ''; });
+    return liste;
+}
+function kaderNamenslisteUebernehmen(text){
+    const t = translations[LANG];
+    const k = aktuellerKader();
+    if(!k) return;
+    const liste = namenslisteLesen(text);
+    let neu = 0, rest = 0;
+    liste.forEach(p => {
+        if(k.players.some(x => x.name.toLowerCase() === p.name.toLowerCase())) return;   // doppelt
+        if(k.players.length >= SQUAD_MAX_PLAYERS){ rest++; return; }
+        k.players.push({ id: kaderNeueId(), name: p.name, nr: p.nr.replace(/\D/g, '').slice(0, 3), role: p.tw ? 'tw' : '', captain: false, sel: true });
+        neu++;
+    });
+    sqAddName.value = '';
+    kaderSpeichern(); kaderRendern();
+    showToast(t.sqListAdded(neu, rest));
+}
+
+/* ---------- Ereignisse ---------- */
+importSaveBtn.addEventListener('click', () => {
+    if(importSel >= 0 && importBlocks[importSel]) kaderAusSpieltag(importBlocks[importSel]);
+});
+/* Einzelner Name: normales Einfuegen. Mehrere Zeilen: als Liste uebernehmen
+   (ein einzeiliges Textfeld wuerde die Zeilenumbrueche sonst verschlucken). */
+sqAddName.addEventListener('paste', e => {
+    const txt = e.clipboardData && e.clipboardData.getData('text');
+    if(!txt || !/\n/.test(txt.trim())) return;
+    e.preventDefault();
+    kaderNamenslisteUebernehmen(txt);
+});
+squadBtn.addEventListener('click', () => {
+    sqNamensModus = ''; sqOffen = '';
+    kaderRendern();
+    squadModal.style.display = 'flex';
+    const inhalt = squadModal.querySelector('.modal-content');
+    if(inhalt) inhalt.scrollTop = 0;
+});
+sqCloseBtn.addEventListener('click', () => { squadModal.style.display = 'none'; });
+// Tipp auf den abgedunkelten Rand schliesst ebenfalls
+squadModal.addEventListener('click', e => { if(e.target === squadModal) squadModal.style.display = 'none'; });
+sqSelect.addEventListener('change', () => {
+    if(!squadData.squads.some(x => x.id === sqSelect.value)) return;
+    squadData.current = sqSelect.value;
+    sqOffen = ''; sqNamensModus = '';
+    kaderSpeichern(); kaderRendern();
+});
+sqNewBtn.addEventListener('click', () => kaderNamensfeldOeffnen('neu'));
+sqRenameBtn.addEventListener('click', () => kaderNamensfeldOeffnen('umbenennen'));
+sqNameOk.addEventListener('click', kaderNameUebernehmen);
+sqNameCancel.addEventListener('click', () => { sqNamensModus = ''; kaderRendern(); });
+sqNameInput.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); kaderNameUebernehmen(); } });
+sqDeleteBtn.addEventListener('click', () => {
+    const k = aktuellerKader();
+    if(!k) return;
+    askConfirm('sqConfirmDelete', () => {
+        squadData.squads = squadData.squads.filter(x => x.id !== k.id);
+        squadData.current = squadData.squads[0] ? squadData.squads[0].id : '';
+        sqOffen = ''; sqNamensModus = '';
+        kaderSpeichern(); kaderRendern();
+    });
+});
+sqAddBtn.addEventListener('click', kaderSpielerHinzufuegen);
+sqAddName.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); kaderSpielerHinzufuegen(); } });
+sqAddNr.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); kaderSpielerHinzufuegen(); } });
+sqAllBtn.addEventListener('click', () => { const k = aktuellerKader(); if(!k) return; k.players.forEach(p => { p.sel = true; }); kaderSpeichern(); kaderRendern(); });
+sqNoneBtn.addEventListener('click', () => { const k = aktuellerKader(); if(!k) return; k.players.forEach(p => { p.sel = false; }); kaderSpeichern(); kaderRendern(); });
+sqForm.addEventListener('change', () => {
+    const e = kaderEinstellungen();
+    if(SQUAD_FORMS.indexOf(sqForm.value) === -1) return;
+    e.form = sqForm.value;
+    e.formation = formationGueltig(e.form, e.formation);
+    kaderSpeichern(); kaderRendern();
+});
+sqFormation.addEventListener('change', () => {
+    const e = kaderEinstellungen();
+    e.formation = formationGueltig(e.form, sqFormation.value);
+    kaderSpeichern();
+});
+sqShowNr.addEventListener('change', () => {
+    const k = aktuellerKader();
+    if(!k) return;
+    k.showNr = sqShowNr.checked;
+    kaderSpeichern();
+});
+sqApplyBtn.addEventListener('click', kaderAufsFeld);
+sqEnemyBtn.addEventListener('click', gegnerAufstellen);
+sqExportBtn.addEventListener('click', () => {
+    const t = translations[LANG];
+    if(!squadData.squads.length){ showToast(t.sqNoSquads); return; }
+    const payload = { app: 'TacticBoard', kind: 'squads', version: 1, squads: squadData.squads };
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    dateiSichern(blob, dateiname('TacticBoard_Kader', '.json'), 'application/json', 'downloads')
+        .then(wohin => { if(wohin !== 'abbruch') showToast(wohin === 'downloads' ? t.msgSavedToDownloads : t.sqExported); })
+        .catch(err => { console.error('Kader-Export:', err); showToast(t.msgShareError + ' (' + kurzFehler(err) + ')'); });
+});
+sqImportBtn.addEventListener('click', () => sqImportInput.click());
+sqImportInput.addEventListener('change', () => {
+    const file = sqImportInput.files && sqImportInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        const t = translations[LANG];
+        let n = 0;
+        try {
+            const data = JSON.parse(String(reader.result || '').replace(/^﻿/, '').trim());
+            // nur echte Kader-Dateien - eine Taktik-Datei hat ebenfalls Namen
+            // und "players" und wuerde sonst als leerer Kader uebernommen
+            if(data && data.kind === 'squads' && Array.isArray(data.squads)) n = kaderImportieren(data.squads);
+        } catch(e){ n = 0; }
+        showToast(n ? t.sqImported(n) : t.sqImportError);
+        sqImportInput.value = '';
+    };
+    reader.readAsText(file);
+});
+swapBtn.addEventListener('click', () => {
+    if(!isDuelable(activePlayer)) return;
+    if(swapSource){ swapAbbrechen(); return; }
+    if(duelSource) duelAbbrechen();
+    swapSource = activePlayer;
+    swapBtn.classList.add('active-toggle');
+    showToast(translations[LANG].msgSwapPick);
+});
 
 /* ---------------------------------------------------
    ARBEITSSTAND AUTOMATISCH SICHERN
