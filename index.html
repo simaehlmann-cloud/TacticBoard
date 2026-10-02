@@ -1651,6 +1651,7 @@ function setupPercentDrag(el, size) {
             el.style.left = fL + '%'; el.style.top = fT + '%';
         }
         function endDrag() {
+            bankNachZiehen(el);
             document.removeEventListener('touchmove', moveDrag); document.removeEventListener('touchend', endDrag);
             document.removeEventListener('mousemove', moveDrag); document.removeEventListener('mouseup', endDrag);
         }
@@ -2928,7 +2929,7 @@ const translations = {
         <u>Spielzüge malen:</u> Bei eingeschalteter 🎬 Animation mit ✏️ Malen einfach eine Linie ziehen: Beginnt sie auf einem Spieler, wird sie zum Laufweg (gestrichelt) – liegt der Ball am Spieler, zum Dribbling (Wellenlinie). Beginnt sie auf dem Ball, wird sie zum Pass. Die Spieler laufen die gemalte Linie flüssig ab, auch Slalom und Richtungswechsel. Jeder neue Weg bekommt automatisch den nächsten Schritt. Malst du nach einem Pass den Laufweg des Passgebers, läuft er im selben Schritt direkt nach dem Abspiel los; andere Spieler im selben Schritt starten gleichzeitig mit dem Pass. <br><br>
         <u>Pass und Dribbling einstellen:</u> Pass antippen → "〰️ Flach" oder "⤴️ Hoch". Ein hoher Ball wird gepunktet dargestellt und steigt in der Animation mit Schatten auf. Beim Dribbling legt "🦶 Fuß" den ballführenden Fuß fest: "auto" wechselt vor jeder Kurve auf den äußeren Fuß, "rechts" oder "links" bleiben fest. <br><br>
         <u>Zweikampf:</u> Spieler auswählen, "⚔️ Zweikampf" tippen, dann den Gegenspieler antippen. Beide werden mit einer roten Zickzack-Linie verbunden und blinken in ihrem Schritt der Animation. <br><br>
-        <u>Kader & Formationen:</u> Über 👥 Kader legst du Mannschaften an und trägst Spieler mit Trikotnummer ein – einzeln oder als ganze Namensliste aus der Zwischenablage. Fügst du dort den geteilten Spieltag aus dem Kaderplaner ein, wird der Kader automatisch angelegt bzw. aktualisiert; angehakt sind dann genau die Spieler dieses Spieltags. Bankspieler erscheinen auf dem Feld mit gestricheltem Rand. Ein Tipp auf den Namen weist eine Rolle zu (Torwart, Abwehr, Mittelfeld, Sturm) oder macht den Spieler zum Kapitän – er bekommt ein kleines „K“ am Kreis. Spieler anhaken, Spielform (6+1, 8+1, 10+1) und Formation wählen, dann „Aufs Feld“: Der Torwart steht im Tor, die Abwehr hinten, der Sturm vorne, überzählige Spieler kommen auf die Bank am Feldrand. „Gegner aufstellen“ stellt die Gegner gespiegelt in derselben Formation auf. Mit „📌 Feld als Formation merken“ speicherst du eine von Hand geschobene Aufstellung als eigene Formation. „Aufs Feld“ lässt sich mit ↩️ Rückgängig zurücknehmen. Kader lassen sich als Datei exportieren, z. B. für Co-Trainer oder als Sicherung. <br><br>
+        <u>Kader & Formationen:</u> Über 👥 Kader legst du Mannschaften an und trägst Spieler mit Trikotnummer ein – einzeln oder als ganze Namensliste aus der Zwischenablage. Fügst du dort den geteilten Spieltag aus dem Kaderplaner ein, wird der Kader automatisch angelegt bzw. aktualisiert; angehakt sind dann genau die Spieler dieses Spieltags. Bankspieler erscheinen auf dem Feld mit gestricheltem Rand. Ein Tipp auf den Namen weist eine Rolle zu (Torwart, Abwehr, Mittelfeld, Sturm) oder macht den Spieler zum Kapitän – er bekommt ein kleines „K“ am Kreis. Spieler anhaken, Spielform (z. B. 6+1, 8+1, 10+1) und Formation wählen – Formationen gibt es für alle Sportarten –, dann „Aufs Feld“: Der Torwart steht im Tor, die Abwehr hinten, der Sturm vorne, überzählige Spieler kommen auf die Bank am Feldrand. „Gegner aufstellen“ stellt die Gegner gespiegelt in derselben Formation auf. Mit „📌 Feld als Formation merken“ speicherst du eine von Hand geschobene Aufstellung als eigene Formation. „Aufs Feld“ lässt sich mit ↩️ Rückgängig zurücknehmen. Kader lassen sich als Datei exportieren, z. B. für Co-Trainer oder als Sicherung. <br><br>
         <u>Tauschen:</u> Spieler auswählen, "⇄ Tauschen" tippen, dann den zweiten Spieler antippen – beide tauschen die Plätze, z. B. bei einem Wechsel von der Bank. <br><br>
         Deine Taktiken lassen sich mitsamt Animation speichern, als Datei exportieren und auf anderen Geräten importieren – oder als Bild bzw. GIF teilen. <br><br>
         Entwickelt von <strong>Simon Mählmann</strong>.`,
@@ -3046,7 +3047,9 @@ const translations = {
         sqOwnSaved: (name, f) => 'Formation „' + name + '“ für ' + f + ' gespeichert.',
         sqOwnExists: 'Diese Formation gibt es schon.',
         sqOwnTooMany: 'Mehr als 20 eigene Formationen sind nicht möglich.',
-        sqOwnWrongCount: n => 'Auf dem Feld stehen ' + n + ' eigene Feldspieler (ohne Torwart und Bank). Für eine Formation braucht es 4, 6, 8 oder 10.',
+        sqOwnWrongCount: (n, erlaubt, tor) => 'Auf dem Feld stehen ' + n + ' eigene Spieler' + (tor ? ' (ohne Torwart und Bank)' : ' (ohne Bank)') + '. Für eine Formation braucht es ' + erlaubt + '.',
+        sqNoGoalieHint: 'Diese Sportart hat keinen Torwart – die Rolle Torwart zählt hier wie „ohne Rolle“.',
+        sqVbNames: { '3-3': '(Grundaufstellung)', '3-2-1': '(Annahme W)' },
         sqOwnConfirmDelete: 'Diese eigene Formation löschen?',
         sqSortChoose: '– wählen –',
         sqSortNr: 'nach Nummer',
@@ -3075,7 +3078,6 @@ const translations = {
         sqFormationLabel: 'Formation',
         sqFree: 'Frei (ohne Formation)',
         sqShowNr: 'Trikotnummer statt Name im Kreis',
-        sqSportHint: 'Formationen gibt es nur beim Fußball – hier werden die Spieler frei aufgestellt.',
         sqRuleHint: 'Torwart ins Tor, Abwehr hinten, Sturm vorne. Spieler ohne Rolle füllen freie Plätze, überzählige kommen auf die Bank am Feldrand.',
         sqApplyBtn: n => '✅ ' + n + ' aufs Feld',
         sqEnemyBtn: '🔵 Gegner aufstellen',
@@ -3097,7 +3099,7 @@ const translations = {
         sqExported: 'Kader exportiert!',
         sqImported: n => n + ' Kader importiert!',
         sqImportError: 'Import fehlgeschlagen – keine Kader-Datei.',
-        sqEnemyNeedsFormation: 'Für die Gegner zuerst Spielform und Formation wählen (nur Fußball).'
+        sqEnemyNeedsFormation: 'Für die Gegner zuerst Spielform und Formation wählen.'
     },
     en: {
         sportNames: { football:'Football', basketball:'Basketball', handball:'Handball', volleyball:'Volleyball', icehockey:'Ice Hockey' },
@@ -3136,7 +3138,7 @@ const translations = {
         <u>Drawing moves:</u> With 🎬 Animation enabled, simply draw a line with ✏️ Draw: if it starts on a player it becomes a run (dashed) – if the ball is at the player's feet, a dribble (wavy line). If it starts on the ball it becomes a pass. Players follow the drawn line smoothly, including slaloms and changes of direction. Each new path automatically gets the next step. If you draw the passer's run after a pass, he starts in the same step right after playing the ball; other players in that step start together with the pass. <br><br>
         <u>Pass and dribble options:</u> Tap a pass → "〰️ Low" or "⤴️ High". A high ball is shown dotted and rises with a shadow during the animation. For a dribble, "🦶 Foot" sets the ball-carrying foot: "auto" switches to the outside foot before each turn, "right" or "left" stay fixed. <br><br>
         <u>Duel:</u> Select a player, tap "⚔️ Duel", then tap the opponent. Both are linked by a red zigzag line and flash during their animation step. <br><br>
-        <u>Squads & formations:</u> Use 👥 Squad to create teams and enter players with shirt numbers – one by one or as a whole name list from the clipboard. If you paste the shared matchday from the squad planner there, the squad is created or updated automatically, with exactly that matchday's players ticked. Bench players appear with a dashed outline on the pitch. Tap a name to assign a position (goalkeeper, defence, midfield, attack) or make the player captain – the circle gets a small “C”. Tick the players, choose a format (6+1, 8+1, 10+1) and a formation, then tap “Place”: the goalkeeper stands in goal, defenders at the back, attackers up front, and extra players go to the bench at the edge. “Set up opponents” places the opponents mirrored in the same formation. “📌 Save pitch as formation” stores a line-up you arranged by hand as a custom formation. ↩️ Undo reverts “Place”. Squads can be exported as a file, e.g. for co-coaches or as a backup. <br><br>
+        <u>Squads & formations:</u> Use 👥 Squad to create teams and enter players with shirt numbers – one by one or as a whole name list from the clipboard. If you paste the shared matchday from the squad planner there, the squad is created or updated automatically, with exactly that matchday's players ticked. Bench players appear with a dashed outline on the pitch. Tap a name to assign a position (goalkeeper, defence, midfield, attack) or make the player captain – the circle gets a small “C”. Tick the players, choose a format (e.g. 6+1, 8+1, 10+1) and a formation – formations exist for every sport – then tap “Place”: the goalkeeper stands in goal, defenders at the back, attackers up front, and extra players go to the bench at the edge. “Set up opponents” places the opponents mirrored in the same formation. “📌 Save pitch as formation” stores a line-up you arranged by hand as a custom formation. ↩️ Undo reverts “Place”. Squads can be exported as a file, e.g. for co-coaches or as a backup. <br><br>
         <u>Swap:</u> Select a player, tap "⇄ Swap", then tap the second player – both swap places, e.g. for a substitution from the bench. <br><br>
         Your tactics can be saved including the animation, exported as a file and imported on other devices – or shared as an image or GIF. <br><br>
         Developed by <strong>Simon Mählmann</strong>.`,
@@ -3254,7 +3256,9 @@ const translations = {
         sqOwnSaved: (name, f) => 'Formation “' + name + '” saved for ' + f + '.',
         sqOwnExists: 'This formation already exists.',
         sqOwnTooMany: 'At most 20 custom formations are possible.',
-        sqOwnWrongCount: n => 'There are ' + n + ' outfield players of your team on the pitch (without goalkeeper and bench). A formation needs 4, 6, 8 or 10.',
+        sqOwnWrongCount: (n, erlaubt, tor) => 'There are ' + n + ' of your players on the pitch' + (tor ? ' (without goalkeeper and bench)' : ' (without bench)') + '. A formation needs ' + erlaubt + '.',
+        sqNoGoalieHint: 'This sport has no goalkeeper – the goalkeeper position counts as “no position” here.',
+        sqVbNames: { '3-3': '(base position)', '3-2-1': '(W reception)' },
         sqOwnConfirmDelete: 'Delete this custom formation?',
         sqSortChoose: '– choose –',
         sqSortNr: 'by number',
@@ -3283,7 +3287,6 @@ const translations = {
         sqFormationLabel: 'Formation',
         sqFree: 'Free (no formation)',
         sqShowNr: 'Show shirt number instead of name',
-        sqSportHint: 'Formations are available for football only – players are placed freely here.',
         sqRuleHint: 'Goalkeeper in goal, defenders at the back, attackers up front. Players without a position fill free spots, extra players go to the bench at the edge.',
         sqApplyBtn: n => '✅ Place ' + n,
         sqEnemyBtn: '🔵 Set up opponents',
@@ -3305,7 +3308,7 @@ const translations = {
         sqExported: 'Squads exported!',
         sqImported: n => n + ' squad(s) imported!',
         sqImportError: 'Import failed – not a squad file.',
-        sqEnemyNeedsFormation: 'Choose a format and formation for the opponents first (football only).'
+        sqEnemyNeedsFormation: 'Choose a format and formation for the opponents first.'
     }
 };
 
@@ -4218,6 +4221,29 @@ const FORMATIONEN = {
     '8':  ['3-3-2', '3-2-3', '2-4-2', '3-4-1'],
     '10': ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '4-1-4-1']
 };
+/* Aufstellung je Sportart. formen = Zahl der Feldspieler, tor = Platz des
+   Torwarts (null: Sportart ohne Torwart - die TW-Rolle zaehlt dann wie
+   "ohne Rolle"). Beim Basketball werden Zonen von vorne nach hinten
+   benannt (2-3 = zwei vorne, drei am Korb) - vonVorne dreht die Ziffern. */
+const SPORT_AUFSTELLUNG = {
+    football:   { formen: ['4', '6', '8', '10'], tor: { x: 6, y: 50 },   formationen: FORMATIONEN },
+    handball:   { formen: ['6'],                 tor: { x: 4.5, y: 50 }, formationen: { '6': ['6-0', '5-1', '3-2-1', '4-2'] } },
+    icehockey:  { formen: ['5'],                 tor: { x: 9.5, y: 50 }, formationen: { '5': ['2-3', '2-1-2', '1-2-2'] } },
+    basketball: { formen: ['5'],                 tor: null, vonVorne: true, formationen: { '5': ['2-3', '1-2-2', '2-1-2', '1-3-1', '3-2'] } },
+    volleyball: { formen: ['6'],                 tor: null,             formationen: { '6': ['3-3', '3-2-1'] } }
+};
+function sportCfg(sport){ return SPORT_AUFSTELLUNG[sport] || SPORT_AUFSTELLUNG.football; }
+function formationenFuer(sport, form){ return sportCfg(sport).formationen[form] || null; }
+function formLabel(sport, form){
+    if(form === 'free') return translations[LANG].sqFree;
+    return form + (sportCfg(sport).tor ? '+1' : '');
+}
+function formationLabel(sport, formation){
+    const f = eigeneFormation(formation);
+    if(f) return '📌 ' + f.name;
+    const namen = sport === 'volleyball' ? translations[LANG].sqVbNames : null;
+    return (namen && namen[formation]) ? formation + ' ' + namen[formation] : formation;
+}
 
 const squadBtn         = document.getElementById('squad-btn');
 const squadModal       = document.getElementById('squad-modal');
@@ -4291,7 +4317,8 @@ const EIGENE_MAX = 20;
 function eigeneFormationSauber(f){
     if(!f || typeof f !== 'object') return null;
     const name = kaderNameSauber(f.name, 24);
-    const form = ['4', '6', '8', '10'].indexOf(String(f.form)) !== -1 ? String(f.form) : '';
+    const sport = SPORT_AUFSTELLUNG[f.sport] ? f.sport : 'football';   // aeltere Eintraege: Fussball
+    const form = sportCfg(sport).formen.indexOf(String(f.form)) !== -1 ? String(f.form) : '';
     const id = String(f.id || '');
     if(!name || !form || !/^c:[\w-]{1,30}$/.test(id) || !Array.isArray(f.slots)) return null;
     const slots = f.slots.slice(0, 10).map(pl => (pl && isFinite(pl.x) && isFinite(pl.y)) ? {
@@ -4300,7 +4327,7 @@ function eigeneFormationSauber(f){
         linie: ['def', 'mid', 'att'].indexOf(pl.linie) !== -1 ? pl.linie : 'mid'
     } : null).filter(Boolean);
     if(slots.length !== parseInt(form, 10)) return null;
-    return { id, name, form, slots };
+    return { id, name, sport, form, slots };
 }
 let eigeneFormationen = (() => {
     try {
@@ -4317,12 +4344,28 @@ function formationsName(formation){
     const f = eigeneFormation(formation);
     return f ? f.name : formation;
 }
-function formationGueltig(form, formation){
-    const liste = FORMATIONEN[form];
+function formationGueltig(form, formation, sport){
+    sport = sport || 'football';
+    const liste = formationenFuer(sport, form);
     if(!liste) return '';
     if(liste.indexOf(formation) !== -1) return formation;
     const f = eigeneFormation(formation);
-    return (f && f.form === form) ? formation : liste[0];
+    return (f && f.form === form && f.sport === sport) ? formation : liste[0];
+}
+/* Einstellungen fuer die anderen Sportarten haengen am Kader unter
+   sportEinst; Fussball nutzt weiter form/formation direkt am Kader. */
+function sportEinstSauber(roh){
+    const out = {};
+    if(!roh || typeof roh !== 'object') return out;
+    Object.keys(SPORT_AUFSTELLUNG).forEach(sp => {
+        if(sp === 'football') return;
+        const e = roh[sp];
+        if(!e || typeof e !== 'object') return;
+        const cfg = sportCfg(sp);
+        const form = (e.form === 'free' || cfg.formen.indexOf(String(e.form)) !== -1) ? String(e.form) : cfg.formen[0];
+        out[sp] = { form, formation: form === 'free' ? '' : formationGueltig(form, e.formation, sp) };
+    });
+    return out;
 }
 function kaderSauber(k){
     if(!k || typeof k !== 'object') return null;
@@ -4337,10 +4380,10 @@ function kaderSauber(k){
         if(p.captain){ if(kapitaen) p.captain = false; kapitaen = true; }
     });
     const form = SQUAD_FORMS.indexOf(String(k.form)) !== -1 ? String(k.form) : '6';
-    return { id: kaderIdSauber(k.id) || kaderNeueId(), name, players, form, formation: formationGueltig(form, k.formation), showNr: k.showNr === true };
+    return { id: kaderIdSauber(k.id) || kaderNeueId(), name, players, form, formation: formationGueltig(form, k.formation), showNr: k.showNr === true, sportEinst: sportEinstSauber(k.sportEinst) };
 }
 function kaderLaden(){
-    const leer = { squads: [], current: '', lose: { form: '6', formation: '2-3-1', showNr: false } };
+    const leer = { squads: [], current: '', lose: { form: '6', formation: '2-3-1', showNr: false, sportEinst: {} } };
     let roh = null;
     try { roh = JSON.parse(localStorage.getItem(SQUAD_KEY) || 'null'); } catch(e){ roh = null; }
     if(!roh || typeof roh !== 'object') return leer;
@@ -4350,7 +4393,7 @@ function kaderLaden(){
     const current = squads.some(k => k.id === roh.current) ? roh.current : (squads[0] ? squads[0].id : '');
     const lr = roh.lose && typeof roh.lose === 'object' ? roh.lose : {};
     const loseForm = SQUAD_FORMS.indexOf(String(lr.form)) !== -1 ? String(lr.form) : '6';
-    return { squads, current, lose: { form: loseForm, formation: formationGueltig(loseForm, lr.formation), showNr: lr.showNr === true } };
+    return { squads, current, lose: { form: loseForm, formation: formationGueltig(loseForm, lr.formation), showNr: lr.showNr === true, sportEinst: sportEinstSauber(lr.sportEinst) } };
 }
 let squadData = kaderLaden();
 
@@ -4366,7 +4409,17 @@ function kaderSpeichern(){
 function aktuellerKader(){ return squadData.squads.find(k => k.id === squadData.current) || null; }
 /* Spielform/Formation haengen am Kader; ohne Kader (nur Gegner aufstellen)
    gelten lose Einstellungen. */
-function kaderEinstellungen(){ return aktuellerKader() || squadData.lose; }
+function kaderEinstellungen(){
+    const basis = aktuellerKader() || squadData.lose;
+    if(currentSport === 'football' || !SPORT_AUFSTELLUNG[currentSport]) return basis;
+    if(!basis.sportEinst || typeof basis.sportEinst !== 'object') basis.sportEinst = {};
+    const cfg = sportCfg(currentSport);
+    let e = basis.sportEinst[currentSport];
+    if(!e || typeof e !== 'object'){ e = { form: cfg.formen[0], formation: '' }; basis.sportEinst[currentSport] = e; }
+    if(e.form !== 'free' && cfg.formen.indexOf(e.form) === -1) e.form = cfg.formen[0];
+    e.formation = e.form === 'free' ? '' : formationGueltig(e.form, e.formation, currentSport);
+    return e;
+}
 
 /* ---------- Kreise auf dem Feld ---------- */
 function istFeldspielerKreis(el){
@@ -4405,6 +4458,18 @@ function kreiseEntfernen(gegner){
     });
     return gemerkt;
 }
+/* Ein Bankspieler, der aufs Feld gezogen wird, ist eingewechselt und sieht
+   aus wie die anderen Feldspieler. Die Bank sind die Randstreifen oben und
+   unten. Umgekehrt macht Ziehen an den Rand bewusst niemanden zum
+   Bankspieler - Aussenspieler stehen oft an der Seitenlinie. Auf die Bank
+   geht es ueber "Tauschen". */
+function bankNachZiehen(el){
+    if(!el.classList.contains('sub')) return;
+    const fh = field.clientHeight;
+    if(!fh) return;
+    const cy = (parseFloat(el.style.top) || 0) + el.offsetHeight / fh * 50;
+    if(cy > 12 && cy < 88) el.classList.remove('sub');
+}
 function aufstellungInVerlauf(gemerkt, neu){
     actionHistory.push({ type: 'lineup', spieler: gemerkt.spieler, pfeile: gemerkt.pfeile, neu });
     trimHistory();
@@ -4419,20 +4484,45 @@ function animationsstandAufloesen(){
 /* Mittelpunkte in Prozent, eigenes Tor links. Die Linien verteilen sich
    gleichmaessig zwischen Abwehr (x=20) und Sturm (x=56/58), die Spieler
    einer Linie symmetrisch um die Mittellinie des Feldes. */
-function formationsPlaetze(formation){
+function formationsPlaetze(formation, sport){
+    sport = sport || 'football';
     const eigen = eigeneFormation(formation);
     if(eigen) return eigen.slots.map(pl => ({ x: pl.x, y: pl.y, linie: pl.linie, frei: true }));
-    const linien = String(formation || '').split('-').map(n => parseInt(n, 10)).filter(n => n > 0);
+    let linien = String(formation || '').split('-').map(n => parseInt(n, 10)).filter(n => n > 0);
+    if(sportCfg(sport).vonVorne) linien = linien.slice().reverse();
     const L = linien.length;
-    const x0 = 20, x1 = L >= 4 ? 58 : 56;
+    const linieVon = i => i === 0 ? 'def' : (i === L - 1 ? 'att' : 'mid');
     const plaetze = [];
+    const dazu = (x, y, linie) => plaetze.push({
+        x: +Math.max(4.5, Math.min(95.5, x)).toFixed(2),
+        y: +Math.max(6.75, Math.min(93.25, y)).toFixed(2), linie, frei: true });
+    if(sport === 'handball'){
+        /* Handball: Linien als Boegen um das eigene Tor - die erste am
+           6-m-Kreis, weitere Richtung 9-m-Linie. Rechnung in Grafik-Einheiten
+           (Feld 100 x 60), Tormitte bei (0|30). */
+        const RADIUS = [19, 27, 34];
+        linien.forEach((n, i) => {
+            const r = RADIUS[Math.min(i, RADIUS.length - 1)];
+            const spanne = n >= 5 ? 62 : n === 4 ? 50 : n === 3 ? 40 : n === 2 ? 25 : 0;
+            for(let j = 0; j < n; j++){
+                const w = (n <= 1 ? 0 : -spanne + j * 2 * spanne / (n - 1)) * Math.PI / 180;
+                dazu(r * Math.cos(w), (30 + r * Math.sin(w)) / 60 * 100, linieVon(i));
+            }
+        });
+        return plaetze;
+    }
+    // Tiefe der hintersten und vordersten Linie je Sportart (Prozent der Feldbreite)
+    const TIEFE = {
+        football:   [20, L >= 4 ? 58 : 56],
+        icehockey:  [22, 40],
+        basketball: [11, 27],
+        volleyball: [21, 43]
+    }[sport] || [20, 56];
+    const [x0, x1] = TIEFE;
     linien.forEach((n, i) => {
-        const x = L === 1 ? 38 : x0 + i * (x1 - x0) / (L - 1);
-        const linie = i === 0 ? 'def' : (i === L - 1 ? 'att' : 'mid');
+        const x = L === 1 ? (x0 + x1) / 2 : x0 + i * (x1 - x0) / (L - 1);
         const abstand = n <= 1 ? 0 : Math.min(26, 60 / (n - 1));
-        for(let j = 0; j < n; j++){
-            plaetze.push({ x: +x.toFixed(2), y: +(50 + (j - (n - 1) / 2) * abstand).toFixed(2), linie, frei: true });
-        }
+        for(let j = 0; j < n; j++) dazu(x, 50 + (j - (n - 1) / 2) * abstand, linieVon(i));
     });
     return plaetze;
 }
@@ -4449,44 +4539,48 @@ function bankPlatz(i){
    3. Ueberzaehlige mit Rolle in die naechste Linie (Abwehr -> Mittelfeld ...).
    4. Spieler ohne Rolle fuellen freie Feldplaetze, zuletzt das Tor.
    5. Der Rest kommt auf die Bank - in Kader-Reihenfolge. */
-function aufstellungPlanen(spieler, form, formation, mitTor){
+function aufstellungPlanen(spieler, form, formation, sport){
+    sport = sport || 'football';
+    const cfg = sportCfg(sport);
+    // Ohne Torwart in der Sportart zaehlt die TW-Rolle wie "ohne Rolle"
+    const rolle = p => (p.role === 'tw' && !cfg.tor) ? '' : p.role;
     const plan = [];
     if(form === 'free'){
         const liste = spieler.slice();
-        const tw = liste.findIndex(p => p.role === 'tw');
+        const tw = cfg.tor ? liste.findIndex(p => p.role === 'tw') : -1;
         if(tw >= 0){
             const k = liste.splice(tw, 1)[0];
-            if(mitTor) plan.push({ p: k, x: 6, y: 50 });
-            else liste.unshift(k);
+            plan.push({ p: k, x: cfg.tor.x, y: cfg.tor.y });
         }
         liste.forEach((p, i) => plan.push({ p, x: 16 + (i % 5) * 8.5, y: 12 + Math.floor(i / 5) * 15.3 }));
         return { plan, bank: 0 };
     }
-    const plaetze = formationsPlaetze(formation);
-    const tor = { x: 6, y: 50, linie: 'tw', frei: true };
+    const plaetze = formationsPlaetze(formation, sport);
+    const tor = cfg.tor ? { x: cfg.tor.x, y: cfg.tor.y, linie: 'tw', frei: true } : null;
     const gesetzt = new Set();
     const setze = (p, pl) => { pl.frei = false; gesetzt.add(p.id); plan.push({ p, x: pl.x, y: pl.y }); };
     const freierPlatz = linie => plaetze.find(pl => pl.frei && pl.linie === linie);
     const NACHBARN = { def: ['mid', 'att'], mid: ['att', 'def'], att: ['mid', 'def'] };
 
-    const torhueter = spieler.find(p => p.role === 'tw');
+    const torhueter = tor ? spieler.find(p => p.role === 'tw') : null;
     if(torhueter) setze(torhueter, tor);
     const ueber = [];
     spieler.forEach(p => {
-        if(p.role === 'def' || p.role === 'mid' || p.role === 'att'){
-            const pl = freierPlatz(p.role);
+        const r = rolle(p);
+        if(r === 'def' || r === 'mid' || r === 'att'){
+            const pl = freierPlatz(r);
             if(pl) setze(p, pl); else ueber.push(p);
         }
     });
     ueber.forEach(p => {
-        for(const l of NACHBARN[p.role]){
+        for(const l of NACHBARN[rolle(p)]){
             const pl = freierPlatz(l);
             if(pl){ setze(p, pl); break; }
         }
     });
     spieler.forEach(p => {
-        if(p.role || gesetzt.has(p.id)) return;
-        const pl = plaetze.find(x => x.frei) || (tor.frei ? tor : null);
+        if(rolle(p) || gesetzt.has(p.id)) return;
+        const pl = plaetze.find(x => x.frei) || (tor && tor.frei ? tor : null);
         if(pl) setze(p, pl);
     });
     let b = 0;
@@ -4515,9 +4609,10 @@ function feldAlsFormationLesen(){
         });
     }
     pos.sort((a, b) => a.x - b.x);
-    if(pos.length && pos[0].x < 13) pos.shift();          // Torwart
+    const cfg = sportCfg(currentSport);
+    if(cfg.tor && pos.length && pos[0].x < cfg.tor.x + 7) pos.shift();   // Torwart
     const n = pos.length;
-    if(['4', '6', '8', '10'].indexOf(String(n)) === -1) return { fehler: n };
+    if(cfg.formen.indexOf(String(n)) === -1) return { fehler: n };
     const xs = pos.map(p => p.x), min = Math.min(...xs), max = Math.max(...xs), drittel = (max - min) / 3;
     const slots = pos.map(p => ({
         x: +p.x.toFixed(2), y: +p.y.toFixed(2),
@@ -4545,9 +4640,8 @@ function kaderAufsFeld(){
     const spieler = k.players.filter(p => p.sel);
     if(!spieler.length){ showToast(t.sqNoneSelected); return; }
     const ausfuehren = () => {
-        const fussball = currentSport === 'football';
-        const form = fussball ? k.form : 'free';
-        const { plan, bank } = aufstellungPlanen(spieler, form, k.formation, fussball);
+        const e = kaderEinstellungen();
+        const { plan, bank } = aufstellungPlanen(spieler, e.form, e.formation, currentSport);
         animationsstandAufloesen();
         selectPlayer(null);
         const gemerkt = kreiseEntfernen(false);
@@ -4571,14 +4665,15 @@ function kaderAufsFeld(){
 function gegnerAufstellen(){
     const t = translations[LANG];
     const e = kaderEinstellungen();
-    if(currentSport !== 'football' || e.form === 'free' || !FORMATIONEN[e.form]){ showToast(t.sqEnemyNeedsFormation); return; }
+    if(e.form === 'free' || !formationenFuer(currentSport, e.form)){ showToast(t.sqEnemyNeedsFormation); return; }
     if(isAnimating){ showToast(t.sqBusy); return; }
-    const formation = formationGueltig(e.form, e.formation);
+    const formation = formationGueltig(e.form, e.formation, currentSport);
+    const cfg = sportCfg(currentSport);
     const ausfuehren = () => {
         animationsstandAufloesen();
         selectPlayer(null);
         const gemerkt = kreiseEntfernen(true);
-        const plaetze = [{ x: 6, y: 50 }].concat(formationsPlaetze(formation));
+        const plaetze = (cfg.tor ? [cfg.tor] : []).concat(formationsPlaetze(formation, currentSport));
         const neu = [];
         plaetze.forEach((pl, i) => {
             const st = centerToStyle(100 - pl.x, pl.y);
@@ -4590,7 +4685,7 @@ function gegnerAufstellen(){
         enemyCounter = plaetze.length;
         squadModal.style.display = 'none';
         updateButtonVisibility();
-        showToast(t.sqEnemyPlaced(e.form + '+1 · ' + formationsName(formation)));
+        showToast(t.sqEnemyPlaced(formLabel(currentSport, e.form) + ' · ' + formationLabel(currentSport, formation).replace(/^📌 /, '')));
     };
     if(kreiseVonSeite(true).length) askConfirm('sqConfirmReplaceEnemy', ausfuehren);
     else ausfuehren();
@@ -4682,52 +4777,52 @@ function kaderRendern(){
 
     // Aufstellung
     const e = kaderEinstellungen();
-    const fussball = currentSport === 'football';
+    const cfg = sportCfg(currentSport);
+    const liste = formationenFuer(currentSport, e.form);
     sqForm.innerHTML = '';
-    SQUAD_FORMS.forEach(f => {
+    cfg.formen.concat(['free']).forEach(f => {
         const o = document.createElement('option');
-        o.value = f; o.textContent = f === 'free' ? t.sqFree : f + '+1';
+        o.value = f; o.textContent = formLabel(currentSport, f);
         sqForm.appendChild(o);
     });
     sqForm.value = e.form;
     sqFormation.innerHTML = '';
-    (FORMATIONEN[e.form] || []).forEach(f => {
+    (liste || []).forEach(f => {
         const o = document.createElement('option');
-        o.value = f; o.textContent = f;
+        o.value = f; o.textContent = formationLabel(currentSport, f);
         sqFormation.appendChild(o);
     });
-    eigeneFormationen.filter(f => f.form === e.form).forEach(f => {
+    eigeneFormationen.filter(f => f.form === e.form && f.sport === currentSport).forEach(f => {
         const o = document.createElement('option');
         o.value = f.id; o.textContent = '📌 ' + f.name;   // textContent: Name stammt vom Nutzer
         sqFormation.appendChild(o);
     });
-    if(FORMATIONEN[e.form]) sqFormation.value = formationGueltig(e.form, e.formation);
-    sqFormationRow.style.display = (fussball && FORMATIONEN[e.form]) ? 'flex' : 'none';
-    sqFormationDel.style.display = eigeneFormation(sqFormation.value) && FORMATIONEN[e.form] ? '' : 'none';
-    sqOwnRow.style.display = (fussball && !sqEigeneEntwurf) ? 'flex' : 'none';
+    if(liste) sqFormation.value = formationGueltig(e.form, e.formation, currentSport);
+    sqFormationRow.style.display = liste ? 'flex' : 'none';
+    sqFormationDel.style.display = (liste && eigeneFormation(sqFormation.value)) ? '' : 'none';
+    sqOwnRow.style.display = sqEigeneEntwurf ? 'none' : 'flex';
     sqOwnNameRow.style.display = sqEigeneEntwurf ? 'flex' : 'none';
-    sqForm.disabled = !fussball;
-    sqSportHint.style.display = '';
-    sqSportHint.textContent = fussball ? (e.form === 'free' ? '' : t.sqRuleHint) : t.sqSportHint;
-    if(!sqSportHint.textContent) sqSportHint.style.display = 'none';
-    sqShowNr.checked = !!e.showNr;
+    sqSportHint.textContent = e.form === 'free' ? '' : t.sqRuleHint + (cfg.tor ? '' : ' ' + t.sqNoGoalieHint);
+    sqSportHint.style.display = sqSportHint.textContent ? '' : 'none';
+    sqShowNr.checked = !!(k && k.showNr);
     sqShowNr.disabled = !k;
 
     const n = k ? k.players.filter(p => p.sel).length : 0;
     // Passt die Auswahl zur Spielform? (nur mit Formation)
-    const braucht = (fussball && FORMATIONEN[e.form]) ? parseInt(e.form, 10) + 1 : 0;
+    const braucht = liste ? parseInt(e.form, 10) + (cfg.tor ? 1 : 0) : 0;
+    const fl = formLabel(currentSport, e.form);
     if(k && n && braucht){
         sqFitHint.style.display = '';
         sqFitHint.classList.toggle('passt', n === braucht);
-        sqFitHint.textContent = n === braucht ? t.sqFitExact(e.form + '+1')
-            : n > braucht ? t.sqFitBench(n, e.form + '+1', braucht, n - braucht)
-            : t.sqFitShort(n, e.form + '+1', braucht, braucht - n);
+        sqFitHint.textContent = n === braucht ? t.sqFitExact(fl)
+            : n > braucht ? t.sqFitBench(n, fl, braucht, n - braucht)
+            : t.sqFitShort(n, fl, braucht, braucht - n);
     } else {
         sqFitHint.style.display = 'none';
     }
     sqApplyBtn.innerHTML = t.sqApplyBtn(n);
     sqApplyBtn.disabled = !k || n === 0;
-    sqEnemyBtn.style.display = (fussball && e.form !== 'free') ? '' : 'none';
+    sqEnemyBtn.style.display = e.form !== 'free' ? '' : 'none';
     sqExportBtn.disabled = !squadData.squads.length;
 }
 
@@ -4828,8 +4923,9 @@ function kaderNameUebernehmen(){
     } else {
         if(squadData.squads.length >= SQUAD_MAX_SQUADS){ showToast(t.sqTooMany); return; }
         // neue Kader uebernehmen die zuletzt benutzte Spielform
-        const e = kaderEinstellungen();
-        const neu = { id: kaderNeueId(), name, players: [], form: e.form, formation: formationGueltig(e.form, e.formation), showNr: false };
+        const e = aktuellerKader() || squadData.lose;   // Fussball-Felder direkt am Kader
+        const neu = { id: kaderNeueId(), name, players: [], form: e.form, formation: formationGueltig(e.form, e.formation), showNr: false,
+                      sportEinst: JSON.parse(JSON.stringify(e.sportEinst || {})) };
         squadData.squads.push(neu);
         squadData.current = neu.id;
         sqOffen = '';
@@ -5035,14 +5131,15 @@ sqAllBtn.addEventListener('click', () => { const k = aktuellerKader(); if(!k) re
 sqNoneBtn.addEventListener('click', () => { const k = aktuellerKader(); if(!k) return; k.players.forEach(p => { p.sel = false; }); kaderSpeichern(); kaderRendern(); });
 sqForm.addEventListener('change', () => {
     const e = kaderEinstellungen();
-    if(SQUAD_FORMS.indexOf(sqForm.value) === -1) return;
-    e.form = sqForm.value;
-    e.formation = formationGueltig(e.form, e.formation);
+    const v = sqForm.value;
+    if(v !== 'free' && sportCfg(currentSport).formen.indexOf(v) === -1) return;
+    e.form = v;
+    e.formation = v === 'free' ? '' : formationGueltig(v, e.formation, currentSport);
     kaderSpeichern(); kaderRendern();
 });
 sqFormation.addEventListener('change', () => {
     const e = kaderEinstellungen();
-    e.formation = formationGueltig(e.form, sqFormation.value);
+    e.formation = formationGueltig(e.form, sqFormation.value, currentSport);
     kaderSpeichern();
     sqFormationDel.style.display = eigeneFormation(sqFormation.value) ? '' : 'none';
 });
@@ -5051,7 +5148,11 @@ sqOwnBtn.addEventListener('click', () => {
     if(eigeneFormationen.length >= EIGENE_MAX){ showToast(t.sqOwnTooMany); return; }
     const f = feldAlsFormationLesen();
     if(!f) return;
-    if(f.fehler !== undefined){ showToast(t.sqOwnWrongCount(f.fehler)); return; }
+    if(f.fehler !== undefined){
+        const cfg = sportCfg(currentSport);
+        showToast(t.sqOwnWrongCount(f.fehler, cfg.formen.join(', '), !!cfg.tor));
+        return;
+    }
     sqEigeneEntwurf = f;
     sqOwnName.value = '';
     kaderRendern();
@@ -5062,10 +5163,10 @@ function eigeneFormationUebernehmen(){
     if(!sqEigeneEntwurf) return;
     const name = kaderNameSauber(sqOwnName.value, 24);
     if(!name){ showToast(t.sqNameMissing); sqOwnName.focus(); return; }
-    if(eigeneFormationen.some(f => f.form === sqEigeneEntwurf.form && f.name.toLowerCase() === name.toLowerCase())){
+    if(eigeneFormationen.some(f => f.sport === currentSport && f.form === sqEigeneEntwurf.form && f.name.toLowerCase() === name.toLowerCase())){
         showToast(t.sqOwnExists); sqOwnName.focus(); return;
     }
-    const neu = { id: 'c:' + kaderNeueId(), name, form: sqEigeneEntwurf.form, slots: sqEigeneEntwurf.slots };
+    const neu = { id: 'c:' + kaderNeueId(), name, sport: currentSport, form: sqEigeneEntwurf.form, slots: sqEigeneEntwurf.slots };
     eigeneFormationen.push(neu);
     sqEigeneEntwurf = null;
     if(!eigeneSpeichern()){ eigeneFormationen.pop(); kaderRendern(); return; }
@@ -5073,7 +5174,7 @@ function eigeneFormationUebernehmen(){
     const e = kaderEinstellungen();
     e.form = neu.form; e.formation = neu.id;
     kaderSpeichern(); kaderRendern();
-    showToast(t.sqOwnSaved(name, neu.form + '+1'));
+    showToast(t.sqOwnSaved(name, formLabel(currentSport, neu.form)));
 }
 sqOwnOk.addEventListener('click', eigeneFormationUebernehmen);
 sqOwnName.addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); eigeneFormationUebernehmen(); } });
@@ -5085,7 +5186,13 @@ sqFormationDel.addEventListener('click', () => {
         eigeneFormationen = eigeneFormationen.filter(x => x.id !== f.id);
         eigeneSpeichern();
         // Kader, die diese Formation nutzten, fallen auf die erste Standardformation zurueck
-        squadData.squads.concat([squadData.lose]).forEach(k => { if(k.formation === f.id) k.formation = formationGueltig(k.form, ''); });
+        squadData.squads.concat([squadData.lose]).forEach(k => {
+            if(k.formation === f.id) k.formation = formationGueltig(k.form, '');
+            Object.keys(k.sportEinst || {}).forEach(sp => {
+                const e = k.sportEinst[sp];
+                if(e && e.formation === f.id) e.formation = formationGueltig(e.form, '', sp);
+            });
+        });
         kaderSpeichern(); kaderRendern();
     });
 });
